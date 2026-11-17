@@ -30,11 +30,8 @@ export const metadata: Metadata = {
   description:
     "Universal Tool Depot (UDT) is Sri Lanka's digital marketplace for contractor-grade power tools, industrial machinery sales, and instant islandwide equipment rentals.",
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png" },
-    ],
-    apple: "/apple-icon.png",
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
+    shortcut: "/favicon.ico",
   },
 };
 
