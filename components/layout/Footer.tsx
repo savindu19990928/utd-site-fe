@@ -193,11 +193,11 @@ export function Footer({ categories }: { categories: Category[] }) {
         {/* Accepted Payments & Copyright */}
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 pt-6">
           <p className="text-xs text-slate-400">
-            &copy; 2026 Universal Tool Depot. Developed by Devrious.
+            &copy; 2026 Universal Tool Depot. Developed by <a href="https://www.devrious.lk">Devrious</a>
           </p>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
             <span className="text-slate-500 font-normal mr-1">Accepted Payments:</span>
-            <span className="rounded bg-white px-2.5 py-1 text-pink-700">KOKO BNPL</span>
+            <span className="rounded bg-white px-2.5 py-1 text-pink-700">KOKO</span>
             <span className="rounded bg-white px-2.5 py-1 text-indigo-700">Mintpay</span>
             <span className="rounded bg-slate-800 border border-slate-700 px-2.5 py-1 text-slate-200">VISA</span>
             <span className="rounded bg-slate-800 border border-slate-700 px-2.5 py-1 text-slate-200">Mastercard</span>
