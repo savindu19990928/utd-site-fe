@@ -2,6 +2,15 @@
 .agent
 .agents
 .vscode
+skills-lock.json
+
+# Local reference mockups & raw source docs not needed in container
+Universal *.png
+utd logo.jpg
+API_DOCUMENTATION.md
+FRONTEND_REQUIREMENTS.md
+Dockerfile
+service.json
 
 # Version control
 .git
