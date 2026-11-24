@@ -173,22 +173,18 @@ export default function RentalSnapshotPage() {
                       <p className="font-mono text-xs text-slate-500">
                         {item.sku} {item.variant_name ? `• ${item.variant_name}` : ""}
                       </p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {item.has_machine_numbers ? (
-                          machineNums.map((num) => (
+                      {machineNums.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {machineNums.map((num) => (
                             <span
                               key={num}
                               className="rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-900"
                             >
                               {num}
                             </span>
-                          ))
-                        ) : (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                            Bulk Stock (No Machine #)
-                          </span>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">{item.quantity}</td>
                     <td className="px-4 py-3 text-center">{item.rental_days}</td>

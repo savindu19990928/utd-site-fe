@@ -7,7 +7,6 @@ import {
   Box,
   CalendarClock,
   ChevronRight,
-  Cpu,
   Filter,
   Grid2x2,
   Hammer,
@@ -36,13 +35,12 @@ interface RentalCatalogExplorerProps {
   initialCategoryId?: number | null;
   initialBrandId?: number | null;
   initialSearch?: string;
-  initialTracking?: "all" | "bulk" | "numbered";
   bannerTitle?: string;
   bannerHighlight?: string;
   bannerSubtitle?: string;
 }
 
-const CATEGORY_ICONS = [Hammer, Wrench, Cpu, SlidersHorizontal, Box, Grid2x2, Sparkles];
+const CATEGORY_ICONS = [Hammer, Wrench, Grid2x2, SlidersHorizontal, Box, Sparkles];
 
 export function RentalCatalogExplorer({
   products,
@@ -51,10 +49,9 @@ export function RentalCatalogExplorer({
   initialCategoryId = null,
   initialBrandId = null,
   initialSearch = "",
-  initialTracking = "all",
   bannerTitle = "Rental",
   bannerHighlight = "Fleet",
-  bannerSubtitle = "Industrial machinery tracked by machine number & bulk site accessories ready to dispatch.",
+  bannerSubtitle = "Industrial construction tools and heavy machinery ready for immediate site dispatch.",
 }: RentalCatalogExplorerProps) {
   const { registerRentalProducts } = useStore();
   useEffect(() => {
@@ -74,9 +71,6 @@ export function RentalCatalogExplorer({
   );
   const [selectedBrandIds, setSelectedBrandIds] = useState<number[]>(
     initialBrandId ? [initialBrandId] : []
-  );
-  const [trackingFilter, setTrackingFilter] = useState<"all" | "bulk" | "numbered">(
-    initialTracking
   );
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [minPrice, setMinPrice] = useState<number>(0);
@@ -106,9 +100,6 @@ export function RentalCatalogExplorer({
     const q = searchTerm.trim().toLowerCase();
 
     const list = products.filter((p) => {
-      if (trackingFilter === "bulk" && p.has_machine_numbers) return false;
-      if (trackingFilter === "numbered" && !p.has_machine_numbers) return false;
-
       if (
         selectedCategoryIds.length > 0 &&
         (!p.category || !selectedCategoryIds.includes(p.category))
@@ -169,7 +160,6 @@ export function RentalCatalogExplorer({
     return sorted;
   }, [
     products,
-    trackingFilter,
     selectedCategoryIds,
     selectedBrandIds,
     availableOnly,
@@ -204,7 +194,6 @@ export function RentalCatalogExplorer({
   const clearAllFilters = () => {
     setSelectedCategoryIds([]);
     setSelectedBrandIds([]);
-    setTrackingFilter("all");
     setSearchTerm("");
     setMinPrice(0);
     setMaxPrice(maxCatalogPrice);
@@ -214,7 +203,6 @@ export function RentalCatalogExplorer({
   const hasActiveFilters =
     selectedCategoryIds.length > 0 ||
     selectedBrandIds.length > 0 ||
-    trackingFilter !== "all" ||
     searchTerm.trim() !== "" ||
     minPrice > 0 ||
     maxPrice < maxCatalogPrice ||
@@ -285,35 +273,6 @@ export function RentalCatalogExplorer({
             );
           })}
         </ul>
-      </div>
-
-      {/* Asset Tracking Mode Filter */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Fleet Tracking Mode
-        </h3>
-        <div className="grid grid-cols-1 gap-1.5">
-          {[
-            { id: "all", label: "All Rental Equipment" },
-            { id: "bulk", label: "Bulk Stock (No Machine #)" },
-            { id: "numbered", label: "Machine-Numbered Assets" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() =>
-                setTrackingFilter(opt.id as "all" | "bulk" | "numbered")
-              }
-              className={`rounded-lg px-3 py-2 text-left text-xs font-bold transition-colors ${
-                trackingFilter === opt.id
-                  ? "bg-[#EA580C] text-white shadow-2xs"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Brands */}
@@ -605,18 +564,6 @@ export function RentalCatalogExplorer({
                     </button>
                   );
                 })}
-                {trackingFilter !== "all" && (
-                  <button
-                    type="button"
-                    onClick={() => setTrackingFilter("all")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-900"
-                  >
-                    {trackingFilter === "numbered"
-                      ? "Machine-Numbered Only"
-                      : "Bulk Stock Only"}
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
                 {availableOnly && (
                   <button
                     type="button"

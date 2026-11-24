@@ -8,8 +8,6 @@ import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
-  Cpu,
-  Layers,
   MapPin,
   Plus,
   ShieldCheck,
@@ -94,7 +92,7 @@ export default function RentalCheckoutPage() {
       api
         .listRentalProducts()
         .then(registerRentalProducts)
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [rentableProducts.length, registerRentalProducts]);
 
@@ -105,13 +103,13 @@ export default function RentalCheckoutPage() {
         setItems((prev) =>
           prev.length === 0
             ? [
-                {
-                  key: `${rentableProducts[0].id}-base-0`,
-                  rentalProductId: rentableProducts[0].id,
-                  rentalVariantId: null,
-                  quantity: 1,
-                },
-              ]
+              {
+                key: `${rentableProducts[0].id}-base-0`,
+                rentalProductId: rentableProducts[0].id,
+                rentalVariantId: null,
+                quantity: 1,
+              },
+            ]
             : prev
         );
       });
@@ -162,15 +160,15 @@ export default function RentalCheckoutPage() {
           setZipCode((prev) => prev || def.postal_code);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isAuthenticated]);
 
   const canCheckAvailability = Boolean(
     isAuthenticated &&
-      items.length > 0 &&
-      startDate &&
-      endDate &&
-      endDate >= startDate
+    items.length > 0 &&
+    startDate &&
+    endDate &&
+    endDate >= startDate
   );
 
   useEffect(() => {
@@ -480,23 +478,9 @@ export default function RentalCheckoutPage() {
                       className="rounded-xl border border-slate-200 p-4 space-y-3 bg-white"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-white">
-                            Item #{index + 1}
-                          </span>
-                          {rp &&
-                            (rp.has_machine_numbers ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-bold text-indigo-800">
-                                <Cpu className="h-3 w-3" />
-                                Machine-Numbered
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-700">
-                                <Layers className="h-3 w-3" />
-                                Bulk Stock (No Machine #)
-                              </span>
-                            ))}
-                        </div>
+                        <span className="rounded bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-white">
+                          Item #{index + 1}
+                        </span>
                         {items.length > 1 && (
                           <button
                             type="button"
@@ -528,8 +512,7 @@ export default function RentalCheckoutPage() {
                             {rentableProducts.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name} ({p.sku}) &mdash;{" "}
-                                {formatLKR(getEffectiveRentalPrice(p), false)}/day{" "}
-                                {p.has_machine_numbers ? "[Machine #]" : "[Bulk Stock]"}
+                                {formatLKR(getEffectiveRentalPrice(p), false)}/day
                               </option>
                             ))}
                           </select>
@@ -583,7 +566,7 @@ export default function RentalCheckoutPage() {
                         </div>
                       )}
 
-                      {/* Live availability & machine numbers */}
+                      {/* Live availability status */}
                       {availLoading ? (
                         <p className="text-xs text-slate-500">
                           Checking real-time availability...
@@ -592,36 +575,15 @@ export default function RentalCheckoutPage() {
                         insufficient ? (
                           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-800">
                             <AlertCircle className="h-4 w-4 shrink-0" />
-                            Only {line.avail.available_quantity} unit(s) available for{" "}
+                            Only {line.avail.available_quantity} available for{" "}
                             {days} days.
                           </div>
                         ) : (
-                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 space-y-1.5">
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
                             <div className="flex items-center gap-1.5 font-bold">
                               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                              Confirmed Available ({line.avail.available_quantity}{" "}
-                              {line.avail.has_machine_numbers ? "machines" : "units"}{" "}
-                              ready)
+                              Confirmed Available ({line.avail.available_quantity} ready)
                             </div>
-                            {line.avail.has_machine_numbers ? (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[11px] font-medium text-emerald-800">
-                                  Auto-assigned from available fleet:
-                                </span>
-                                {line.avail.available_machines.map((m) => (
-                                  <span
-                                    key={m.id}
-                                    className="rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold"
-                                  >
-                                    {m.machine_number}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-emerald-800">
-                                Bulk stock — no individual machine numbers assigned.
-                              </p>
-                            )}
                           </div>
                         )
                       ) : null}

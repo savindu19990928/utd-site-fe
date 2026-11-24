@@ -10,9 +10,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronRight,
-  Cpu,
   Info,
-  Layers,
   Minus,
   Plus,
   ShieldCheck,
@@ -106,9 +104,17 @@ export function RentalDetailClient({
     useState<RentalAvailabilityResponse | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
 
+  const visibleSpecs = useMemo(
+    () =>
+      (product.specifications ?? []).filter(
+        (spec) => spec.name.trim().toLowerCase() !== "tracking mode"
+      ),
+    [product.specifications]
+  );
+
   const [infoTab, setInfoTab] = useState<
     "specs" | "description" | "policy" | "reviews"
-  >(product.specifications.length > 0 ? "specs" : "description");
+  >(visibleSpecs.length > 0 ? "specs" : "description");
 
   const [reviews, setReviews] = useState<RentalProductReview[]>(
     product.reviews ?? []
@@ -391,9 +397,7 @@ export function RentalDetailClient({
                   >
                     {!isInStock
                       ? "Currently Unavailable"
-                      : product.has_machine_numbers
-                      ? `${stockCount} machines in depot`
-                      : `${stockCount} units in depot`}
+                      : `${stockCount} available`}
                   </span>
                 </div>
 
@@ -440,33 +444,6 @@ export function RentalDetailClient({
                   )}
                 </div>
               </div>
-
-              {/* Machine Number vs Bulk Stock Tracking Banner */}
-              {product.has_machine_numbers ? (
-                <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3.5 text-xs text-indigo-950">
-                  <Cpu className="mt-0.5 h-4 w-4 shrink-0 text-indigo-700" />
-                  <div>
-                    <p className="font-bold">
-                      Individual Machine-Numbered Asset Tracking
-                    </p>
-                    <p className="mt-0.5 text-indigo-900/90">
-                      Each machine carries a unique fleet ID (e.g., <span className="font-mono font-bold">RFP-0001</span>). Available machine numbers are automatically assigned to your booking for your selected dates.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-800">
-                  <Layers className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
-                  <div>
-                    <p className="font-bold">
-                      Bulk Stock Rental (No Machine Numbers)
-                    </p>
-                    <p className="mt-0.5 text-slate-600">
-                      Tracked by bulk stock quantity only — ideal for multi-unit orders such as 20+ scaffolding clamps or site accessories.
-                    </p>
-                  </div>
-                </div>
-              )}
 
               {/* Variant Selector */}
               {activeVariants.length > 0 && (
@@ -601,7 +578,7 @@ export function RentalDetailClient({
                   </div>
                 </div>
 
-                {/* Live Fleet & Machine Number Availability Banner */}
+                {/* Live Fleet Availability Banner */}
                 {endDate < startDate ? (
                   <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
                     <AlertCircle className="h-4 w-4 shrink-0" />
@@ -610,11 +587,7 @@ export function RentalDetailClient({
                 ) : !isAuthenticated ? (
                   <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-950">
                     <span className="font-medium">
-                      Sign in to verify live date-range availability
-                      {product.has_machine_numbers
-                        ? " & preview available machine numbers"
-                        : ""}{" "}
-                      ({stockCount} total in depot).
+                      Sign in to verify live date-range availability ({stockCount} total in depot).
                     </span>
                     <Link
                       href={`/login?redirect=${encodeURIComponent(
@@ -634,28 +607,11 @@ export function RentalDetailClient({
                     {availError}
                   </div>
                 ) : effectiveAvailQty !== null && effectiveAvailQty >= rentQty ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900 space-y-2">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
                     <div className="flex items-center gap-2 font-bold">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
-                      Available for Selected Dates ({effectiveAvailQty}{" "}
-                      {availability?.has_machine_numbers ? "machines" : "units"} ready)
+                      Available for Selected Dates ({effectiveAvailQty} ready)
                     </div>
-                    {availability?.has_machine_numbers &&
-                      availability.available_machines.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-[11px] font-semibold text-emerald-800">
-                            Available Machine Numbers:
-                          </span>
-                          {availability.available_machines.map((m) => (
-                            <span
-                              key={m.id}
-                              className="rounded border border-emerald-300 bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-900"
-                            >
-                              {m.machine_number}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                   </div>
                 ) : effectiveAvailQty !== null ? (
                   <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-bold text-red-800">
@@ -773,10 +729,10 @@ export function RentalDetailClient({
             {[
               {
                 id: "specs",
-                label: `Technical Specifications (${product.specifications.length})`,
+                label: `Technical Specifications (${visibleSpecs.length})`,
               },
               { id: "description", label: "Description & Applications" },
-              { id: "policy", label: "Deposit & Machine Tracking Policy" },
+              { id: "policy", label: "Deposit & Rental Terms" },
               { id: "reviews", label: `Renter Reviews (${ratingStats.count})` },
             ].map((tab) => (
               <button
@@ -801,7 +757,7 @@ export function RentalDetailClient({
           <div className="p-6">
             {infoTab === "specs" && (
               <div>
-                {product.specifications.length === 0 ? (
+                {visibleSpecs.length === 0 ? (
                   <p className="text-sm text-slate-500">
                     Detailed specifications are listed in the equipment description.
                   </p>
@@ -809,7 +765,7 @@ export function RentalDetailClient({
                   <div className="overflow-hidden rounded-xl border border-slate-200">
                     <table className="w-full text-sm">
                       <tbody className="divide-y divide-slate-200">
-                        {product.specifications.map((spec, idx) => (
+                        {visibleSpecs.map((spec, idx) => (
                           <tr
                             key={spec.id}
                             className={idx % 2 === 0 ? "bg-slate-50/70" : "bg-white"}
@@ -847,18 +803,6 @@ export function RentalDetailClient({
                   <p className="text-amber-900">
                     Rentals include a 100% refundable 10x security deposit (
                     {formatLKR(dailyRental * 10)} per unit) held while the equipment is on site.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-1.5">
-                  <p className="font-bold text-slate-900">
-                    {product.has_machine_numbers
-                      ? "Machine-Numbered Unit Assignment"
-                      : "Bulk Stock Quantity Tracking"}
-                  </p>
-                  <p className="text-slate-600">
-                    {product.has_machine_numbers
-                      ? "Specific alphanumeric machine numbers (e.g., RFP-0001) are automatically reserved when you confirm your booking so your site supervisor can verify exact serials upon delivery."
-                      : "Bulk consumables and hardware accessories are tracked by aggregate depot quantity without per-unit machine numbers."}
                   </p>
                 </div>
               </div>

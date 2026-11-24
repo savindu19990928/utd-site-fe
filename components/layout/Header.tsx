@@ -506,11 +506,6 @@ export function Header({
                                 >
                                   {match.kind === "sale" ? "BUY" : "RENT"}
                                 </span>
-                                {match.kind === "rent" && match.item.has_machine_numbers && (
-                                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                                    Machine #
-                                  </span>
-                                )}
                                 <p className="truncate text-sm font-semibold text-slate-900">
                                   {item.name}
                                 </p>

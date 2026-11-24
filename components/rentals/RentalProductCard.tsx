@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarClock, Cpu, Layers, Star, Wrench } from "lucide-react";
+import { CalendarClock, Star, Wrench } from "lucide-react";
 import {
   DEPOSIT_MULTIPLIER,
   formatLKR,
@@ -34,18 +34,6 @@ export function RentalProductCard({
   const stockCount = getEffectiveStock(product);
   const inStock = product.is_available && stockCount > 0;
   const ratingStats = getProductRatingStats(product);
-
-  const trackingBadge = product.has_machine_numbers ? (
-    <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-800">
-      <Cpu className="h-3 w-3" />
-      Machine # Tracked
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-      <Layers className="h-3 w-3" />
-      Bulk Stock
-    </span>
-  );
 
   if (view === "list") {
     return (
@@ -85,7 +73,6 @@ export function RentalProductCard({
               <span className="font-mono text-[11px] text-slate-400">
                 {product.sku}
               </span>
-              {trackingBadge}
             </div>
             <Link
               href={`/rentals/${product.id}`}
@@ -123,11 +110,7 @@ export function RentalProductCard({
                   inStock ? "text-emerald-700" : "text-red-600"
                 }`}
               >
-                {!inStock
-                  ? "Fleet Busy / Unavailable"
-                  : product.has_machine_numbers
-                  ? `${stockCount} machines ready`
-                  : `${stockCount} units available`}
+                {!inStock ? "Fleet Busy / Unavailable" : `${stockCount} available`}
               </span>
             </div>
           </div>
@@ -166,14 +149,13 @@ export function RentalProductCard({
   return (
     <article className="group flex flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-[#EA580C]/70 hover:shadow-md transition-all">
       <div className="relative mb-2.5 aspect-[4/3] w-full overflow-hidden rounded-lg bg-white">
-        <div className="absolute left-1.5 top-1.5 z-10 flex flex-col gap-1">
-          {discountPct > 0 && (
+        {discountPct > 0 && (
+          <div className="absolute left-1.5 top-1.5 z-10">
             <span className="inline-block w-fit rounded-md bg-[#EA580C] px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
               -{Math.round(discountPct)}%
             </span>
-          )}
-          {trackingBadge}
-        </div>
+          </div>
+        )}
 
         <Link href={`/rentals/${product.id}`} className="block relative h-full w-full">
           {img ? (
@@ -234,10 +216,12 @@ export function RentalProductCard({
                 />
               ))}
             </div>
-            <span className="text-[11px] font-semibold text-emerald-700">
-              {product.has_machine_numbers
-                ? `${stockCount} machines ready`
-                : `${stockCount} units available`}
+            <span
+              className={`text-[11px] font-semibold ${
+                inStock ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {inStock ? `${stockCount} available` : "Unavailable"}
             </span>
           </div>
         </div>

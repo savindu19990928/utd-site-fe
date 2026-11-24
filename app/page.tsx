@@ -187,13 +187,13 @@ export default async function HomePage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-[#EA580C]/20 border border-[#EA580C]/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-orange-300 mb-2">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Separate Rental Fleet &amp; Categories
+                Short-Term &amp; Site Rental Fleet
               </div>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight">
                 Featured <span className="text-[#F5A623]">Rental Machinery</span>
               </h2>
               <p className="mt-1 text-sm text-slate-300 max-w-2xl">
-                Includes bulk stock gear (e.g. scaffolding clamps) and machine-numbered machinery (e.g. floor polishers) with live calendar availability and a 100% refundable 10x security deposit.
+                Transparent daily rates with live calendar availability and a 100% refundable 10x security deposit upon return inspection.
               </p>
             </div>
             <Link

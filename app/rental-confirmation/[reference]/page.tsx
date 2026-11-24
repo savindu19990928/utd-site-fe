@@ -6,9 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import {
   CalendarClock,
   CheckCircle2,
-  Cpu,
   ExternalLink,
-  Layers,
   MapPin,
   Printer,
 } from "lucide-react";
@@ -225,7 +223,7 @@ export default function RentalConfirmationPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-900 text-left text-xs uppercase text-white">
                 <tr>
-                  <th className="px-4 py-3">Equipment &amp; Assigned Machine #</th>
+                  <th className="px-4 py-3">Equipment</th>
                   <th className="px-4 py-3 text-center">Qty</th>
                   <th className="px-4 py-3 text-center">Days</th>
                   <th className="px-4 py-3 text-right">Daily Rate</th>
@@ -251,35 +249,21 @@ export default function RentalConfirmationPage() {
                           {item.sku}{" "}
                           {item.variant_name ? `• ${item.variant_name}` : ""}
                         </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {item.has_machine_numbers ? (
-                            <>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-indigo-800">
-                                <Cpu className="h-3 w-3" />
-                                Assigned Machines:
-                              </span>
-                              {machineNums.length > 0 ? (
-                                machineNums.map((num) => (
-                                  <span
-                                    key={num}
-                                    className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-900"
-                                  >
-                                    {num}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-[11px] text-slate-500">
-                                  Pending assignment
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                              <Layers className="h-3 w-3" />
-                              Bulk Stock (No Machine #)
+                        {machineNums.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase text-indigo-800">
+                              Machine #:
                             </span>
-                          )}
-                        </div>
+                            {machineNums.map((num) => (
+                              <span
+                                key={num}
+                                className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-900"
+                              >
+                                {num}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center font-semibold">
                         {item.quantity}
