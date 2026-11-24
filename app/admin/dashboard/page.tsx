@@ -17,10 +17,11 @@ import {
   getEffectiveStock,
   getOrderStatusBadgeClasses,
 } from "@/lib/format";
-import type { Order, Payment, Product, Rental } from "@/lib/types";
+import type { Order, Payment, Product, Rental, RentalProduct } from "@/lib/types";
 
 export default function AdminDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [rentalProducts, setRentalProducts] = useState<RentalProduct[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -29,12 +30,14 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     Promise.all([
       api.listProducts().catch(() => []),
+      api.listRentalProducts(undefined, { auth: true }).catch(() => []),
       api.listOrders().catch(() => []),
       api.listRentals().catch(() => []),
       api.listPayments().catch(() => []),
     ])
-      .then(([p, o, r, pay]) => {
+      .then(([p, rp, o, r, pay]) => {
         setProducts(p);
+        setRentalProducts(rp);
         setOrders(o);
         setRentals(r);
         setPayments(pay);
@@ -63,11 +66,14 @@ export default function AdminDashboardPage() {
     };
   }, [orders, rentals, products, payments]);
 
-  // Category distribution for clean SVG chart
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     for (const p of products) {
-      const key = p.category_name || "Uncategorized";
+      const key = p.category_name || "Sale Uncategorized";
+      map[key] = (map[key] || 0) + 1;
+    }
+    for (const rp of rentalProducts) {
+      const key = rp.category_name || "Rental Uncategorized";
       map[key] = (map[key] || 0) + 1;
     }
     const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -77,7 +83,7 @@ export default function AdminDashboardPage() {
       count,
       pct: Math.round((count / maxCount) * 100),
     }));
-  }, [products]);
+  }, [products, rentalProducts]);
 
   return (
     <div className="space-y-6">
@@ -87,7 +93,7 @@ export default function AdminDashboardPage() {
             Operations Dashboard
           </h1>
           <p className="text-sm text-slate-600">
-            Real-time overview of catalog stock, sales revenue, rental fleet utilization, and pending verifications.
+            Overview of separate sale &amp; rental catalogs, machine-numbered fleet availability, and Direct Bank Transfer verifications.
           </p>
         </div>
 
@@ -97,13 +103,20 @@ export default function AdminDashboardPage() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5A623] px-4 py-2.5 text-xs font-extrabold text-zinc-950 hover:bg-[#e09212]"
           >
             <Plus className="h-4 w-4" />
-            Add Equipment
+            Add Sale Product
+          </Link>
+          <Link
+            href="/admin/rental-products/new"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#EA580C] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-orange-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Rental Equipment
           </Link>
           <Link
             href="/admin/payments"
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800"
           >
-            Pending Slips ({kpis.pendingPayments})
+            Pending Bank Slips ({kpis.pendingPayments})
           </Link>
         </div>
       </div>
@@ -135,8 +148,11 @@ export default function AdminDashboardPage() {
           <p className="mt-2 text-2xl font-extrabold text-slate-950">
             {loading ? "..." : kpis.activeRentals}
           </p>
-          <Link href="/admin/rentals" className="mt-1 inline-block text-xs font-bold text-[#EA580C] hover:underline">
-            Manage rental fleet &rarr;
+          <Link
+            href="/admin/rentals"
+            className="mt-1 inline-block text-xs font-bold text-[#EA580C] hover:underline"
+          >
+            Manage rental fleet ({rentalProducts.length} items) &rarr;
           </Link>
         </div>
 
@@ -150,7 +166,10 @@ export default function AdminDashboardPage() {
           <p className="mt-2 text-2xl font-extrabold text-slate-950">
             {loading ? "..." : kpis.pendingOrders}
           </p>
-          <Link href="/admin/orders" className="mt-1 inline-block text-xs font-bold text-[#D97706] hover:underline">
+          <Link
+            href="/admin/orders"
+            className="mt-1 inline-block text-xs font-bold text-[#D97706] hover:underline"
+          >
             View sales orders &rarr;
           </Link>
         </div>
@@ -158,7 +177,7 @@ export default function AdminDashboardPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-slate-500">
-              Low Stock Alerts (&le;5)
+              Low Sale Stock (&le;5)
             </span>
             <AlertTriangle className="h-5 w-5 text-red-500" />
           </div>
@@ -166,7 +185,7 @@ export default function AdminDashboardPage() {
             {loading ? "..." : kpis.lowStock.length}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Out of {products.length} total catalog SKUs
+            Out of {products.length} sale SKUs ({rentalProducts.length} rental SKUs)
           </p>
         </div>
       </div>
@@ -175,7 +194,7 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <h2 className="text-base font-bold text-slate-900">
-            Catalog Distribution by Category
+            Sale &amp; Rental Catalog Distribution by Category
           </h2>
           <div className="space-y-3">
             {categoryBreakdown.map((item) => (
@@ -186,7 +205,11 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className="h-full rounded-full bg-[#F5A623]"
+                    className={`h-full rounded-full ${
+                      item.name.toLowerCase().includes("rental")
+                        ? "bg-[#EA580C]"
+                        : "bg-[#F5A623]"
+                    }`}
                     style={{ width: `${item.pct}%` }}
                   />
                 </div>
@@ -197,14 +220,17 @@ export default function AdminDashboardPage() {
 
         <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">Low Stock SKUs</h2>
-            <Link href="/admin/products" className="text-xs font-bold text-[#D97706] hover:underline">
-              All Products
+            <h2 className="text-base font-bold text-slate-900">Low Stock Sale SKUs</h2>
+            <Link
+              href="/admin/products"
+              className="text-xs font-bold text-[#D97706] hover:underline"
+            >
+              All Sale Products
             </Link>
           </div>
           {kpis.lowStock.length === 0 ? (
             <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg p-4 font-semibold">
-              All catalog equipment has healthy stock levels (&gt; 5 units).
+              All sale equipment has healthy stock levels (&gt; 5 units).
             </p>
           ) : (
             <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
@@ -236,7 +262,10 @@ export default function AdminDashboardPage() {
               <Package className="h-4 w-4 text-[#F5A623]" />
               Recent Sales Orders
             </h2>
-            <Link href="/admin/orders" className="text-xs font-bold text-[#D97706] hover:underline">
+            <Link
+              href="/admin/orders"
+              className="text-xs font-bold text-[#D97706] hover:underline"
+            >
               Manage All
             </Link>
           </div>
@@ -271,7 +300,10 @@ export default function AdminDashboardPage() {
               <CalendarClock className="h-4 w-4 text-[#EA580C]" />
               Recent Rental Bookings
             </h2>
-            <Link href="/admin/rentals" className="text-xs font-bold text-[#EA580C] hover:underline">
+            <Link
+              href="/admin/rentals"
+              className="text-xs font-bold text-[#EA580C] hover:underline"
+            >
               Manage Fleet
             </Link>
           </div>

@@ -1,82 +1,12 @@
 {
   "version": 2,
   "skills": {
-    "accessibility-audit": {
-      "source": "AccessLint/skills",
-      "commit": "2e9d7336678302d0bc08848e92542560295b34d3",
-      "sourceType": "github",
-      "skillPath": "plugins/accesslint/skills/accessibility-audit/SKILL.md",
-      "computedHash": "9664edf4d5c7b9ac7e416d1e198bebefb7565cbb0e3869d6c10df6d610fd026a"
-    },
-    "accessibility-diff": {
-      "source": "AccessLint/skills",
-      "commit": "2e9d7336678302d0bc08848e92542560295b34d3",
-      "sourceType": "github",
-      "skillPath": "plugins/accesslint/skills/accessibility-diff/SKILL.md",
-      "computedHash": "ff2cc6767f7f9288018f2b4a5f6dbc374f571f00c2a10fbe1c291a0738a02917"
-    },
-    "accessibility-fix": {
-      "source": "AccessLint/skills",
-      "commit": "2e9d7336678302d0bc08848e92542560295b34d3",
-      "sourceType": "github",
-      "skillPath": "plugins/accesslint/skills/accessibility-fix/SKILL.md",
-      "computedHash": "4b3435a1e6eaf7a4e6b7497d45831e0d4c338591bd980bfa48cc1597b522fa39"
-    },
-    "accessibility-inspect": {
-      "source": "AccessLint/skills",
-      "commit": "2e9d7336678302d0bc08848e92542560295b34d3",
-      "sourceType": "github",
-      "skillPath": "plugins/accesslint/skills/accessibility-inspect/SKILL.md",
-      "computedHash": "c63f0b5e064c81de58eedc01ddac05456212f7d3e2658409f81bb4d949734f98"
-    },
-    "accessibility-scan": {
-      "source": "AccessLint/skills",
-      "commit": "2e9d7336678302d0bc08848e92542560295b34d3",
-      "sourceType": "github",
-      "skillPath": "plugins/accesslint/skills/accessibility-scan/SKILL.md",
-      "computedHash": "f548cbfd3a0032758cc30605d4ba1485d0ee41ea4d98374c35311ed702409bde"
-    },
     "agent-browser": {
       "source": "vercel-labs/agent-browser",
-      "commit": "b06e2533ba9b3823b8a96c859d455cb55f4d7893",
+      "commit": "0a923358ea989d7602f0d06507ad3447c62ffe9b",
       "sourceType": "github",
       "skillPath": "skills/agent-browser/SKILL.md",
       "computedHash": "a0dfac7503f69bcf529b2660fc79964064c4f179eb65695904ddc45fc0d99d20"
-    },
-    "derive-client": {
-      "source": "vercel-labs/agent-browser",
-      "commit": "b06e2533ba9b3823b8a96c859d455cb55f4d7893",
-      "sourceType": "github",
-      "skillPath": "skill-data/derive-client/SKILL.md",
-      "computedHash": "5f861033b5dc9e7f7665877214b5a73e1ec5f978f0151dd9c17e05a266cee9b2"
-    },
-    "find-skills": {
-      "source": "vercel-labs/skills",
-      "commit": "57217cf86ba38148a57af9e90d14a4c049558330",
-      "sourceType": "github",
-      "skillPath": "skills/find-skills/SKILL.md",
-      "computedHash": "7bc223e2aafbdbf6e50ea243ba6ef67fe432bb069ab439fea0390795dac0bf7f"
-    },
-    "modern-web-guidance": {
-      "source": "vercel-labs/agent-browser",
-      "commit": "b06e2533ba9b3823b8a96c859d455cb55f4d7893",
-      "sourceType": "github",
-      "skillPath": "skill-data/modern-web-guidance/SKILL.md",
-      "computedHash": "bd779e7437fb83edc6956b183635b36574f8aa22e48777f93078354b0ce01862"
-    },
-    "web-typography": {
-      "source": "wondelai/skills",
-      "commit": "c5265583b1a9740f06831e1d3e89b35bba3eb430",
-      "sourceType": "github",
-      "skillPath": "web-typography/SKILL.md",
-      "computedHash": "dec11effdd7686fbbf0efda5e41ce2a5681a2f83b339bcec9ca41bf855b1841f"
-    },
-    "writing-guidelines": {
-      "source": "vercel-labs/agent-skills",
-      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
-      "sourceType": "github",
-      "skillPath": "skills/writing-guidelines/SKILL.md",
-      "computedHash": "fe1390adbe2f7ba68d5fb85d3b14a1d55e71ce04cff5c175245c550d1c3a6f7e"
     }
   }
 }

@@ -1,5 +1,6 @@
 import React, { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { CatalogExplorer } from "@/components/catalog/CatalogExplorer";
 import {
   getCachedBrands,
@@ -10,7 +11,7 @@ import {
 export const metadata: Metadata = {
   title: "Our Catalog",
   description:
-    "Explore Universal Tool Depot's complete catalog of contractor power tools, welding machines, pressure washers, and hand tools.",
+    "Explore Universal Tool Depot's complete catalog of contractor power tools, welding machines, pressure washers, and hand tools for purchase.",
 };
 
 async function CatalogContent({
@@ -19,6 +20,10 @@ async function CatalogContent({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sp = await searchParams;
+  if (sp.for_rent === "true") {
+    redirect("/rentals");
+  }
+
   const [products, categories, brands] = await Promise.all([
     getCachedProducts(),
     getCachedCategories(),
@@ -26,12 +31,6 @@ async function CatalogContent({
   ]);
 
   const search = typeof sp.search === "string" ? sp.search : "";
-  const initialMode =
-    sp.for_rent === "true"
-      ? "rent"
-      : sp.for_sale === "true"
-      ? "sale"
-      : "all";
   const initialCategoryId =
     typeof sp.category === "string" && /^\d+$/.test(sp.category)
       ? Number(sp.category)
@@ -43,7 +42,6 @@ async function CatalogContent({
       categories={categories}
       brands={brands}
       initialSearch={search}
-      initialMode={initialMode}
       initialCategoryId={initialCategoryId}
     />
   );

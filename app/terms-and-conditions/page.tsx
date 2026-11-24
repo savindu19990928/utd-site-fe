@@ -52,6 +52,12 @@ export default function TermsPage() {
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               <span>
+                <strong>Bulk Stock &amp; Machine-Numbered Fleet:</strong> Bulk items (such as scaffolding clamps) are tracked by total quantity with no individual machine numbers, while powered machinery carries unique alphanumeric machine numbers (e.g., <span className="font-mono font-semibold">RFP-0001</span>) assigned on dispatch.
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+              <span>
                 <strong>Normal Wear vs. Misuse:</strong> Routine wear on bits, brushes, and blades is covered. Damage caused by improper voltage supply, missing major accessories, or severe structural neglect may be deducted transparently at repair cost.
               </span>
             </li>
@@ -73,7 +79,7 @@ export default function TermsPage() {
           </p>
           <ul className="space-y-2 text-sm text-slate-700">
             <li>
-              &bull; <strong>Payment Options:</strong> We support Koko (3 interest-free installments), Mintpay (3 card installments), and Direct Bank Transfer to Commercial Bank of Ceylon (Account 1000 8923 4510, Colombo 03).
+              &bull; <strong>Payment Options:</strong> We accept Direct Bank Transfer to Commercial Bank of Ceylon (Account 1000 8923 4510, Colombo 03). Quote your Order or Rental Reference Number when transferring.
             </li>
             <li>
               &bull; <strong>Cancellations:</strong> Pending sales orders and pending rental bookings can be cancelled prior to dispatch without penalty.

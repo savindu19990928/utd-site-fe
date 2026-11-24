@@ -1,6 +1,7 @@
 import type {
   Address,
   AddressPayload,
+  AssignMachinesPayload,
   AuthTokens,
   Brand,
   Cart,
@@ -13,7 +14,6 @@ import type {
   Payment,
   PaymentMethod,
   Product,
-  Product3DModel,
   ProductImage,
   ProductQueryParams,
   ProductReview,
@@ -22,6 +22,17 @@ import type {
   Refund,
   RegisterPayload,
   Rental,
+  RentalAvailabilityResponse,
+  RentalCategory,
+  RentalMachine,
+  RentalMachineStatus,
+  RentalProduct,
+  RentalProductImage,
+  RentalProductPayload,
+  RentalProductQueryParams,
+  RentalProductReview,
+  RentalProductSpecification,
+  RentalProductVariant,
   RentalStatus,
   UserProfile,
   Wishlist,
@@ -57,7 +68,9 @@ export function setAuthExpiredHandler(cb: (() => void) | null) {
 export function getAccessToken(): string | null {
   if (inMemoryAccessToken) return inMemoryAccessToken;
   if (typeof window !== "undefined") {
-    const stored = window.sessionStorage.getItem(ACCESS_STORAGE_KEY) || window.localStorage.getItem(ACCESS_STORAGE_KEY);
+    const stored =
+      window.sessionStorage.getItem(ACCESS_STORAGE_KEY) ||
+      window.localStorage.getItem(ACCESS_STORAGE_KEY);
     if (stored) {
       inMemoryAccessToken = stored;
       return stored;
@@ -153,15 +166,20 @@ interface RequestOptions extends RequestInit {
   skipRefresh?: boolean;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = false, skipRefresh = false, headers: customHeaders, body, ...rest } = options;
+export async function apiRequest<T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const { auth = false, skipRefresh = false, headers: customHeaders, body, ...rest } =
+    options;
 
   const buildHeaders = (tokenOverride?: string | null): HeadersInit => {
     const h: Record<string, string> = {};
     if (!(body instanceof FormData)) {
       h["Content-Type"] = "application/json";
     }
-    const token = tokenOverride !== undefined ? tokenOverride : auth ? getAccessToken() : null;
+    const token =
+      tokenOverride !== undefined ? tokenOverride : auth ? getAccessToken() : null;
     if (token) {
       h["Authorization"] = `Bearer ${token}`;
     }
@@ -195,7 +213,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const contentType = res.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
-  const payload = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
+  const payload = isJson
+    ? await res.json().catch(() => null)
+    : await res.text().catch(() => null);
 
   if (!res.ok) {
     throw new ApiError(
@@ -208,13 +228,27 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T;
 }
 
+function toQueryString(params?: Record<string, unknown>): string {
+  if (!params) return "";
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") {
+      qs.set(k, String(v));
+    }
+  });
+  const query = qs.toString();
+  return query ? `?${query}` : "";
+}
+
 export const api = {
   // Auth
   register: (data: RegisterPayload) =>
-    apiRequest<{ username: string; email: string; first_name: string; last_name: string }>(
-      "/api/auth/register/",
-      { method: "POST", body: JSON.stringify(data) }
-    ),
+    apiRequest<{
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+    }>("/api/auth/register/", { method: "POST", body: JSON.stringify(data) }),
 
   login: (username: string, password: string) =>
     apiRequest<AuthTokens>("/api/auth/login/", {
@@ -260,7 +294,7 @@ export const api = {
   deleteAddress: (id: number) =>
     apiRequest<void>(`/api/addresses/${id}/`, { method: "DELETE", auth: true }),
 
-  // Categories & Brands
+  // Sale Categories & Brands
   listCategories: () => apiRequest<Category[]>("/api/categories/"),
   createCategory: (data: { name: string; description?: string }) =>
     apiRequest<Category>("/api/categories/", {
@@ -287,19 +321,9 @@ export const api = {
   deleteBrand: (id: number) =>
     apiRequest<void>(`/api/brands/${id}/`, { method: "DELETE", auth: true }),
 
-  // Products
-  listProducts: (params?: ProductQueryParams) => {
-    const qs = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== "") {
-          qs.set(k, String(v));
-        }
-      });
-    }
-    const query = qs.toString();
-    return apiRequest<Product[]>(`/api/products/${query ? `?${query}` : ""}`);
-  },
+  // Sale Products
+  listProducts: (params?: ProductQueryParams) =>
+    apiRequest<Product[]>(`/api/products/${toQueryString(params as Record<string, unknown>)}`),
 
   getProduct: (id: number | string) => apiRequest<Product>(`/api/products/${id}/`),
 
@@ -320,8 +344,8 @@ export const api = {
   deleteProduct: (id: number) =>
     apiRequest<void>(`/api/products/${id}/`, { method: "DELETE", auth: true }),
 
-  // Variants, Specifications, Images, 3D Models
-  createVariant: (data: Omit<ProductVariant, "id">) =>
+  // Sale Variants, Specifications, Images
+  createVariant: (data: Omit<ProductVariant, "id" | "available_stock">) =>
     apiRequest<ProductVariant>("/api/product-variants/", {
       method: "POST",
       auth: true,
@@ -361,18 +385,11 @@ export const api = {
   deleteProductImage: (id: number) =>
     apiRequest<void>(`/api/product-images/${id}/`, { method: "DELETE", auth: true }),
 
-  attach3DModel: (data: { product: number; url: string; format?: string } | FormData) =>
-    apiRequest<Product3DModel>("/api/product-3d-models/", {
-      method: "POST",
-      auth: true,
-      body: data instanceof FormData ? data : JSON.stringify(data),
+  // Sale Product Reviews
+  listReviews: () =>
+    apiRequest<ProductReview[]>("/api/product-reviews/", {
+      auth: Boolean(getAccessToken()),
     }),
-
-  delete3DModel: (id: number) =>
-    apiRequest<void>(`/api/product-3d-models/${id}/`, { method: "DELETE", auth: true }),
-
-  // Reviews
-  listReviews: () => apiRequest<ProductReview[]>("/api/product-reviews/", { auth: Boolean(getAccessToken()) }),
   submitReview: (data: { product: number; rating: number; comment: string }) =>
     apiRequest<ProductReview>("/api/product-reviews/", {
       method: "POST",
@@ -388,8 +405,201 @@ export const api = {
   deleteReview: (id: number) =>
     apiRequest<void>(`/api/product-reviews/${id}/`, { method: "DELETE", auth: true }),
 
+  // Separate Rental Categories & Rental Products
+  listRentalCategories: () => apiRequest<RentalCategory[]>("/api/rental-categories/"),
+  createRentalCategory: (data: { name: string; description?: string }) =>
+    apiRequest<RentalCategory>("/api/rental-categories/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  updateRentalCategory: (
+    id: number,
+    data: Partial<{ name: string; description: string }>
+  ) =>
+    apiRequest<RentalCategory>(`/api/rental-categories/${id}/`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  deleteRentalCategory: (id: number) =>
+    apiRequest<void>(`/api/rental-categories/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  listRentalProducts: (
+    params?: RentalProductQueryParams,
+    options?: { auth?: boolean }
+  ) =>
+    apiRequest<RentalProduct[]>(
+      `/api/rental-products/${toQueryString(params as Record<string, unknown>)}`,
+      { auth: options?.auth ?? Boolean(getAccessToken()) }
+    ),
+
+  getRentalProduct: (id: number | string, options?: { auth?: boolean }) =>
+    apiRequest<RentalProduct>(`/api/rental-products/${id}/`, {
+      auth: options?.auth ?? Boolean(getAccessToken()),
+    }),
+
+  createRentalProduct: (data: Partial<RentalProductPayload>) =>
+    apiRequest<RentalProduct>("/api/rental-products/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  updateRentalProduct: (id: number, data: Partial<RentalProductPayload>) =>
+    apiRequest<RentalProduct>(`/api/rental-products/${id}/`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  deleteRentalProduct: (id: number) =>
+    apiRequest<void>(`/api/rental-products/${id}/`, { method: "DELETE", auth: true }),
+
+  // Rental Product Sub-resources
+  createRentalVariant: (
+    data: Omit<RentalProductVariant, "id" | "available_stock">
+  ) =>
+    apiRequest<RentalProductVariant>("/api/rental-product-variants/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  updateRentalVariant: (id: number, data: Partial<RentalProductVariant>) =>
+    apiRequest<RentalProductVariant>(`/api/rental-product-variants/${id}/`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  deleteRentalVariant: (id: number) =>
+    apiRequest<void>(`/api/rental-product-variants/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  createRentalSpecification: (data: {
+    rental_product: number;
+    name: string;
+    value: string;
+  }) =>
+    apiRequest<RentalProductSpecification>("/api/rental-product-specifications/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  deleteRentalSpecification: (id: number) =>
+    apiRequest<void>(`/api/rental-product-specifications/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  uploadRentalProductImage: (formData: FormData) =>
+    apiRequest<RentalProductImage>("/api/rental-product-images/", {
+      method: "POST",
+      auth: true,
+      body: formData,
+    }),
+
+  deleteRentalProductImage: (id: number) =>
+    apiRequest<void>(`/api/rental-product-images/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  listRentalReviews: () =>
+    apiRequest<RentalProductReview[]>("/api/rental-product-reviews/", {
+      auth: Boolean(getAccessToken()),
+    }),
+  submitRentalReview: (data: {
+    rental_product: number;
+    rating: number;
+    comment: string;
+  }) =>
+    apiRequest<RentalProductReview>("/api/rental-product-reviews/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  updateRentalReview: (id: number, data: Partial<RentalProductReview>) =>
+    apiRequest<RentalProductReview>(`/api/rental-product-reviews/${id}/`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  deleteRentalReview: (id: number) =>
+    apiRequest<void>(`/api/rental-product-reviews/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
+  // Rental Machines (Admin Only)
+  listRentalMachines: (params?: {
+    rental_product?: number;
+    variant?: number;
+    status?: RentalMachineStatus;
+    search?: string;
+    ordering?: string;
+  }) =>
+    apiRequest<RentalMachine[]>(
+      `/api/rental-machines/${toQueryString(params as Record<string, unknown>)}`,
+      { auth: true }
+    ),
+
+  createRentalMachine: (data: {
+    rental_product: number;
+    variant?: number | null;
+    machine_number: string;
+    status?: RentalMachineStatus;
+    notes?: string;
+  }) =>
+    apiRequest<RentalMachine>("/api/rental-machines/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  bulkCreateRentalMachines: (data: {
+    rental_product: number;
+    variant?: number | null;
+    machine_numbers: string[];
+    status?: RentalMachineStatus;
+  }) =>
+    apiRequest<RentalMachine[]>("/api/rental-machines/bulk-create/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  updateRentalMachine: (
+    id: number,
+    data: Partial<{
+      machine_number: string;
+      variant: number | null;
+      status: RentalMachineStatus;
+      notes: string;
+    }>
+  ) =>
+    apiRequest<RentalMachine>(`/api/rental-machines/${id}/`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+
+  deleteRentalMachine: (id: number) =>
+    apiRequest<void>(`/api/rental-machines/${id}/`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
   // Coupons
-  listCoupons: () => apiRequest<Coupon[]>("/api/coupons/", { auth: Boolean(getAccessToken()) }),
+  listCoupons: () =>
+    apiRequest<Coupon[]>("/api/coupons/", { auth: Boolean(getAccessToken()) }),
   createCoupon: (data: Coupon) =>
     apiRequest<Coupon>("/api/coupons/", {
       method: "POST",
@@ -428,7 +638,8 @@ export const api = {
   clearCart: () => apiRequest<void>("/api/cart/clear/", { method: "DELETE", auth: true }),
 
   getWishlist: () => apiRequest<Wishlist>("/api/wishlist/", { auth: true }),
-  listWishlistItems: () => apiRequest<WishlistItem[]>("/api/wishlist/items/", { auth: true }),
+  listWishlistItems: () =>
+    apiRequest<WishlistItem[]>("/api/wishlist/items/", { auth: true }),
   addWishlistItem: (product: number) =>
     apiRequest<WishlistItem>("/api/wishlist/items/", {
       method: "POST",
@@ -448,9 +659,12 @@ export const api = {
   listOrders: () => apiRequest<Order[]>("/api/orders/", { auth: true }),
   getOrder: (id: number) => apiRequest<Order>(`/api/orders/${id}/`, { auth: true }),
 
-  // Payments & Refunds
+  // Payments & Refunds (Direct Bank Transfer Only)
   listPayments: () => apiRequest<Payment[]>("/api/payments/", { auth: true }),
-  initiatePayment: (order_id: number, method: PaymentMethod) =>
+  initiatePayment: (
+    order_id: number,
+    method: PaymentMethod = "BANK_TRANSFER"
+  ) =>
     apiRequest<Payment>("/api/payments/initiate/", {
       method: "POST",
       auth: true,
@@ -464,22 +678,22 @@ export const api = {
     }),
   listRefunds: () => apiRequest<Refund[]>("/api/refunds/", { auth: true }),
 
-  // Rentals
+  // Rentals & Machine Assignment
   checkRentalAvailability: (params: {
-    product_id: number;
-    variant_id?: number | null;
+    rental_product_id: number;
+    rental_variant_id?: number | null;
     start_date: string;
     end_date: string;
   }) => {
     const qs = new URLSearchParams({
-      product_id: String(params.product_id),
+      rental_product_id: String(params.rental_product_id),
       start_date: params.start_date,
       end_date: params.end_date,
     });
-    if (params.variant_id) {
-      qs.set("variant_id", String(params.variant_id));
+    if (params.rental_variant_id) {
+      qs.set("rental_variant_id", String(params.rental_variant_id));
     }
-    return apiRequest<{ available_quantity: number }>(
+    return apiRequest<RentalAvailabilityResponse>(
       `/api/rentals/availability/?${qs.toString()}`,
       { auth: true }
     );
@@ -489,6 +703,12 @@ export const api = {
   getRental: (id: number) => apiRequest<Rental>(`/api/rentals/${id}/`, { auth: true }),
   createRental: (data: CreateRentalPayload) =>
     apiRequest<Rental>("/api/rentals/", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  assignRentalMachines: (rentalId: number, data: AssignMachinesPayload) =>
+    apiRequest<Rental>(`/api/rentals/${rentalId}/assign-machines/`, {
       method: "POST",
       auth: true,
       body: JSON.stringify(data),

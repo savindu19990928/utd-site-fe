@@ -1,8 +1,16 @@
-import type { Product, ProductVariant } from "./types";
+import type {
+  Product,
+  ProductVariant,
+  RentalProduct,
+  RentalProductVariant,
+} from "./types";
 
 export const DEPOSIT_MULTIPLIER = 10;
 
-export function formatLKR(value: number | string | null | undefined, showDecimals = true): string {
+export function formatLKR(
+  value: number | string | null | undefined,
+  showDecimals = true
+): string {
   const num = typeof value === "string" ? parseFloat(value) : Number(value ?? 0);
   if (!Number.isFinite(num)) return showDecimals ? "Rs. 0.00" : "Rs. 0";
   return `Rs. ${num.toLocaleString("en-LK", {
@@ -51,13 +59,19 @@ export function countRentalDays(startDate: string, endDate: string): number {
   return diff >= 0 ? diff + 1 : 0;
 }
 
-export function getBaseSalePrice(product: Product, variant?: ProductVariant | null): number {
+export function getBaseSalePrice(
+  product: Pick<Product, "sale_price">,
+  variant?: Pick<ProductVariant, "additional_price"> | null
+): number {
   const base = parseFloat(product.sale_price ?? "0") || 0;
   const add = variant ? parseFloat(variant.additional_price ?? "0") || 0 : 0;
   return Math.max(0, base + add);
 }
 
-export function getEffectiveSalePrice(product: Product, variant?: ProductVariant | null): number {
+export function getEffectiveSalePrice(
+  product: Pick<Product, "sale_price" | "discount">,
+  variant?: Pick<ProductVariant, "additional_price"> | null
+): number {
   const raw = getBaseSalePrice(product, variant);
   const disc = parseFloat(product.discount ?? "0") || 0;
   if (disc > 0 && disc < 100) {
@@ -66,17 +80,40 @@ export function getEffectiveSalePrice(product: Product, variant?: ProductVariant
   return raw;
 }
 
-export function getEffectiveRentalPrice(product: Product, variant?: ProductVariant | null): number {
+export function getBaseRentalPrice(
+  product: Pick<RentalProduct, "rental_price">,
+  variant?: Pick<RentalProductVariant, "additional_rental_price"> | null
+): number {
   const base = parseFloat(product.rental_price ?? "0") || 0;
-  const add = variant ? parseFloat(variant.additional_rental_price ?? "0") || 0 : 0;
+  const add = variant
+    ? parseFloat(variant.additional_rental_price ?? "0") || 0
+    : 0;
   return Math.max(0, base + add);
 }
 
-export function getEffectiveStock(product: Product, variant?: ProductVariant | null): number {
-  if (variant) return Number(variant.stock ?? 0);
-  const avail = typeof product.available_stock === "string"
-    ? parseInt(product.available_stock, 10)
-    : product.available_stock;
+export function getEffectiveRentalPrice(
+  product: Pick<RentalProduct, "rental_price" | "discount">,
+  variant?: Pick<RentalProductVariant, "additional_rental_price"> | null
+): number {
+  const raw = getBaseRentalPrice(product, variant);
+  const disc = parseFloat(product.discount ?? "0") || 0;
+  if (disc > 0 && disc < 100) {
+    return Math.round(raw * (1 - disc / 100) * 100) / 100;
+  }
+  return raw;
+}
+
+export function getEffectiveStock(
+  product: Pick<Product | RentalProduct, "stock" | "available_stock">,
+  variant?: { stock: number; available_stock?: number } | null
+): number {
+  if (variant) {
+    return Number(variant.available_stock ?? variant.stock ?? 0);
+  }
+  const avail =
+    typeof product.available_stock === "string"
+      ? parseInt(product.available_stock, 10)
+      : product.available_stock;
   return Number.isFinite(avail) ? Number(avail) : Number(product.stock ?? 0);
 }
 
@@ -89,8 +126,10 @@ export function calculateRentalBreakdown(
   const safeDays = Math.max(0, days);
   const safeQty = Math.max(1, quantity);
   const rentalSubtotal = Math.round(dailyPrice * safeDays * safeQty * 100) / 100;
-  const securityDeposit = Math.round(dailyPrice * depositMultiplier * safeQty * 100) / 100;
-  const totalPayable = Math.round((rentalSubtotal + securityDeposit) * 100) / 100;
+  const securityDeposit =
+    Math.round(dailyPrice * depositMultiplier * safeQty * 100) / 100;
+  const totalPayable =
+    Math.round((rentalSubtotal + securityDeposit) * 100) / 100;
   return {
     days: safeDays,
     quantity: safeQty,
@@ -101,7 +140,9 @@ export function calculateRentalBreakdown(
   };
 }
 
-export function getProductPrimaryImage(product: Pick<Product, "images">): string | null {
+export function getProductPrimaryImage(product: {
+  images?: Array<{ image: string; is_primary: boolean; display_order: number }>;
+}): string | null {
   if (!product.images || product.images.length === 0) return null;
   const sorted = [...product.images].sort((a, b) => {
     if (a.is_primary && !b.is_primary) return -1;
@@ -111,7 +152,9 @@ export function getProductPrimaryImage(product: Pick<Product, "images">): string
   return sorted[0]?.image ?? null;
 }
 
-export function getProductRatingStats(product: Pick<Product, "reviews">) {
+export function getProductRatingStats(product: {
+  reviews?: Array<{ rating: number; is_approved?: boolean }>;
+}) {
   const approved = (product.reviews ?? []).filter((r) => r.is_approved !== false);
   if (approved.length === 0) {
     return { average: 0, count: 0, distribution: [0, 0, 0, 0, 0] };
@@ -148,11 +191,15 @@ export function getMapsHref(taggedLocation: string | null | undefined): string |
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     return trimmed;
   }
-  const coordsMatch = trimmed.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  const coordsMatch = trimmed.match(
+    /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/
+  );
   if (coordsMatch) {
     return `https://www.google.com/maps?q=${coordsMatch[1]},${coordsMatch[2]}`;
   }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    trimmed
+  )}`;
 }
 
 export function getOrderStatusBadgeClasses(status: string): string {
@@ -162,14 +209,17 @@ export function getOrderStatusBadgeClasses(status: string): string {
     case "SUCCESS":
     case "DELIVERED":
     case "COMPLETED":
+    case "AVAILABLE":
       return "bg-emerald-100 text-emerald-800 border-emerald-200";
     case "PROCESSING":
     case "SHIPPED":
       return "bg-sky-100 text-sky-800 border-sky-200";
     case "PENDING":
+    case "MAINTENANCE":
       return "bg-amber-100 text-amber-900 border-amber-200";
     case "CANCELLED":
     case "FAILED":
+    case "RETIRED":
       return "bg-red-100 text-red-800 border-red-200";
     case "RETURNED":
     case "REFUNDED":

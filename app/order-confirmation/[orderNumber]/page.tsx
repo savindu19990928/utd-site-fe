@@ -193,33 +193,25 @@ export default function OrderConfirmationPage() {
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-1.5">
               <p className="font-bold uppercase tracking-wider text-slate-500">
-                Payment Instructions
+                Bank Transfer Instructions
               </p>
-              {payment?.method === "BANK_TRANSFER" ? (
-                <>
-                  <p className="font-bold text-slate-900">
-                    Commercial Bank of Ceylon &bull; A/C 1000 8923 4510
-                  </p>
-                  <p className="text-slate-600">
-                    Universal Tool Depot (Pvt) Ltd (Colombo 03). Quote{" "}
-                    <strong className="font-mono">{order.order_number}</strong> as remark.
-                  </p>
-                  {extras.bankSlipName && (
-                    <p className="text-emerald-700 font-semibold">
-                      Slip attached: {extras.bankSlipName}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="font-bold text-slate-900">
-                    {payment?.method || "Online Installment Gateway"}
-                  </p>
-                  <p className="text-slate-600">
-                    Total Amount: <strong>{formatLKR(order.final_amount)}</strong> (3
-                    installments of {formatLKR(parseFloat(order.final_amount) / 3)}).
-                  </p>
-                </>
+              <p className="font-bold text-slate-900">
+                Commercial Bank of Ceylon &bull; A/C 1000 8923 4510
+              </p>
+              <p className="text-slate-600">
+                Universal Tool Depot (Pvt) Ltd (Colombo 03). Transfer{" "}
+                <strong>{formatLKR(order.final_amount)}</strong> and quote{" "}
+                <strong className="font-mono">{order.order_number}</strong> as remark.
+              </p>
+              {extras.bankRefNote && (
+                <p className="text-slate-700 font-semibold">
+                  Reference Note: {extras.bankRefNote}
+                </p>
+              )}
+              {extras.bankSlipName && (
+                <p className="text-emerald-700 font-semibold">
+                  Slip attached: {extras.bankSlipName}
+                </p>
               )}
             </div>
           </div>

@@ -3,17 +3,34 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { formatDateDisplay, formatLKR, getEffectiveStock, toISODateInput } from "@/lib/format";
-import type { Order, Payment, Product, Refund, Rental } from "@/lib/types";
+import {
+  formatDateDisplay,
+  formatLKR,
+  getEffectiveStock,
+  toISODateInput,
+} from "@/lib/format";
+import type {
+  Order,
+  Payment,
+  Product,
+  Refund,
+  Rental,
+  RentalProduct,
+} from "@/lib/types";
 
-function downloadCSV(filename: string, headers: string[], rows: Array<Array<string | number>>) {
+function downloadCSV(
+  filename: string,
+  headers: string[],
+  rows: Array<Array<string | number>>
+) {
   const escape = (val: string | number) => {
     const str = String(val ?? "");
     return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
   };
-  const csv = [headers.map(escape).join(","), ...rows.map((r) => r.map(escape).join(","))].join(
-    "\n"
-  );
+  const csv = [
+    headers.map(escape).join(","),
+    ...rows.map((r) => r.map(escape).join(",")),
+  ].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -38,6 +55,7 @@ export default function AdminReportsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [rentalProducts, setRentalProducts] = useState<RentalProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,13 +65,15 @@ export default function AdminReportsPage() {
       api.listPayments().catch(() => []),
       api.listRefunds().catch(() => []),
       api.listProducts().catch(() => []),
+      api.listRentalProducts(undefined, { auth: true }).catch(() => []),
     ])
-      .then(([o, r, pay, ref, prod]) => {
+      .then(([o, r, pay, ref, prod, rentProd]) => {
         setOrders(o);
         setRentals(r);
         setPayments(pay);
         setRefunds(ref);
         setProducts(prod);
+        setRentalProducts(rentProd);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -85,22 +105,38 @@ export default function AdminReportsPage() {
 
   const paymentMethodTotals = useMemo(() => {
     const totals: Record<string, { count: number; amount: number }> = {
-      KOKO: { count: 0, amount: 0 },
-      MINTPAY: { count: 0, amount: 0 },
       BANK_TRANSFER: { count: 0, amount: 0 },
     };
     for (const p of filteredPayments) {
-      if (!totals[p.method]) totals[p.method] = { count: 0, amount: 0 };
-      totals[p.method].count += 1;
-      totals[p.method].amount += parseFloat(p.amount) || 0;
+      const key = p.method || "BANK_TRANSFER";
+      if (!totals[key]) totals[key] = { count: 0, amount: 0 };
+      totals[key].count += 1;
+      totals[key].amount += parseFloat(p.amount) || 0;
     }
     return totals;
   }, [filteredPayments]);
 
-  const lowStockProducts = useMemo(
-    () => products.filter((p) => getEffectiveStock(p) <= 10).sort((a, b) => getEffectiveStock(a) - getEffectiveStock(b)),
-    [products]
-  );
+  const lowStockItems = useMemo(() => {
+    const saleWatch = products
+      .filter((p) => getEffectiveStock(p) <= 10)
+      .map((p) => ({
+        key: `sale-${p.id}`,
+        name: p.name,
+        sku: p.sku,
+        type: "SALE" as const,
+        stock: getEffectiveStock(p),
+      }));
+    const rentalWatch = rentalProducts
+      .filter((rp) => getEffectiveStock(rp) <= 10)
+      .map((rp) => ({
+        key: `rent-${rp.id}`,
+        name: rp.name,
+        sku: rp.sku,
+        type: "RENTAL" as const,
+        stock: getEffectiveStock(rp),
+      }));
+    return [...saleWatch, ...rentalWatch].sort((a, b) => a.stock - b.stock);
+  }, [products, rentalProducts]);
 
   const reportCards = [
     {
@@ -140,17 +176,18 @@ export default function AdminReportsPage() {
         ),
     },
     {
-      title: "3. Income & Payment Method Breakdown",
-      description: `${filteredPayments.length} transactions across Koko, Mintpay & Bank Transfer`,
+      title: "3. Bank Transfer Income Breakdown",
+      description: `${filteredPayments.length} Direct Bank Transfer transactions`,
       onCsv: () =>
         downloadCSV(
           `utd-payment-breakdown-${fromDate}-to-${toDate}.csv`,
-          ["Order Number", "Method", "Status", "Transaction ID", "Amount", "Created"],
+          ["Order Number", "Method", "Status", "Transaction ID", "Bank Ref", "Amount", "Created"],
           filteredPayments.map((p) => [
             p.order_number,
             p.method,
             p.status,
             p.transaction_id || "",
+            p.bank_reference || "",
             p.amount,
             formatDateDisplay(p.created_at),
           ])
@@ -173,20 +210,42 @@ export default function AdminReportsPage() {
     },
     {
       title: "5. Inventory Stock Depletion Report",
-      description: `${lowStockProducts.length} SKUs at or below 10 units in depot`,
+      description: `${lowStockItems.length} Sale & Rental SKUs at or below 10 units`,
       onCsv: () =>
         downloadCSV(
           `utd-inventory-depletion-${today}.csv`,
-          ["SKU", "Name", "Category", "Brand", "Available Stock", "Sale Price", "Daily Rental"],
-          products.map((p) => [
-            p.sku,
-            p.name,
-            p.category_name || "",
-            p.brand_name || "",
-            getEffectiveStock(p),
-            p.sale_price || "",
-            p.rental_price || "",
-          ])
+          [
+            "Catalog Type",
+            "SKU",
+            "Name",
+            "Category",
+            "Brand",
+            "Tracking Mode",
+            "Available Stock",
+            "Price / Daily Rate",
+          ],
+          [
+            ...products.map((p) => [
+              "SALE",
+              p.sku,
+              p.name,
+              p.category_name || "",
+              p.brand_name || "",
+              "Sale Stock",
+              getEffectiveStock(p),
+              p.sale_price,
+            ]),
+            ...rentalProducts.map((rp) => [
+              "RENTAL",
+              rp.sku,
+              rp.name,
+              rp.category_name || "",
+              rp.brand_name || "",
+              rp.has_machine_numbers ? "Machine-Numbered" : "Bulk Stock",
+              getEffectiveStock(rp),
+              `${rp.rental_price}/day`,
+            ]),
+          ]
         ),
     },
   ];
@@ -268,7 +327,11 @@ export default function AdminReportsPage() {
             {Object.entries(paymentMethodTotals).map(([method, data]) => (
               <div key={method} className="flex items-center justify-between py-3">
                 <div>
-                  <p className="font-bold text-slate-900">{method}</p>
+                  <p className="font-bold text-slate-900">
+                    {method === "BANK_TRANSFER"
+                      ? "Direct Bank Transfer (BANK_TRANSFER)"
+                      : method}
+                  </p>
                   <p className="text-xs text-slate-500">{data.count} transactions</p>
                 </div>
                 <span className="font-extrabold text-slate-950">
@@ -281,17 +344,28 @@ export default function AdminReportsPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-3">
           <h2 className="text-base font-bold text-slate-900">
-            Low Stock Depletion Watchlist (&le; 10 units)
+            Low Stock Watchlist (&le; 10 units)
           </h2>
           <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto text-xs">
-            {lowStockProducts.map((p) => (
-              <div key={p.id} className="flex items-center justify-between py-2.5">
+            {lowStockItems.map((item) => (
+              <div key={item.key} className="flex items-center justify-between py-2.5">
                 <div>
-                  <p className="font-bold text-slate-900">{p.name}</p>
-                  <p className="font-mono text-slate-400">{p.sku}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                        item.type === "SALE"
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-orange-100 text-[#EA580C]"
+                      }`}
+                    >
+                      {item.type}
+                    </span>
+                    <p className="font-bold text-slate-900">{item.name}</p>
+                  </div>
+                  <p className="font-mono text-slate-400 mt-0.5">{item.sku}</p>
                 </div>
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-bold text-amber-900">
-                  {getEffectiveStock(p)} units
+                  {item.stock} units
                 </span>
               </div>
             ))}

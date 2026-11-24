@@ -7,7 +7,6 @@ import { Heart, ShoppingCart, Trash2, Wrench } from "lucide-react";
 import { useStore } from "@/components/providers/StoreProvider";
 import {
   formatLKR,
-  getEffectiveRentalPrice,
   getEffectiveSalePrice,
   getProductPrimaryImage,
 } from "@/lib/format";
@@ -22,7 +21,7 @@ export default function WishlistPage() {
           My Saved Tools ({wishlistItems.length})
         </h1>
         <p className="text-sm text-slate-500">
-          Quickly move saved equipment into your purchase cart or book a site rental.
+          Quickly move saved equipment into your purchase cart.
         </p>
       </div>
 
@@ -37,7 +36,7 @@ export default function WishlistPage() {
             href="/catalog"
             className="mt-5 inline-block rounded-lg bg-[#F5A623] px-5 py-2.5 text-sm font-bold text-zinc-950"
           >
-            Browse Catalog
+            Browse Shop Catalog
           </Link>
         </div>
       ) : (
@@ -70,30 +69,19 @@ export default function WishlistPage() {
                     {product.name}
                   </p>
                   <p className="text-base font-extrabold text-slate-950">
-                    {product.is_for_sale
-                      ? formatLKR(getEffectiveSalePrice(product))
-                      : `${formatLKR(getEffectiveRentalPrice(product))} / day`}
+                    {formatLKR(getEffectiveSalePrice(product))}
                   </p>
                 </Link>
 
                 <div className="mt-4 flex items-center gap-2">
-                  {product.is_for_sale ? (
-                    <button
-                      type="button"
-                      onClick={() => void addToCart(product, 1, null, true)}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#F5A623] py-2 text-xs font-bold text-zinc-950 hover:bg-[#e09212]"
-                    >
-                      <ShoppingCart className="h-3.5 w-3.5" />
-                      Add to Cart
-                    </button>
-                  ) : (
-                    <Link
-                      href={`/product/${product.id}?tab=rent`}
-                      className="flex flex-1 items-center justify-center rounded-lg bg-[#EA580C] py-2 text-xs font-bold text-white"
-                    >
-                      Book Rental
-                    </Link>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void addToCart(product, 1, null, true)}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#F5A623] py-2 text-xs font-bold text-zinc-950 hover:bg-[#e09212]"
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    Add to Cart
+                  </button>
                   <button
                     type="button"
                     onClick={() => void toggleWishlist(product)}

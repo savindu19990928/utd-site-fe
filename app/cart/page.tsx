@@ -201,7 +201,7 @@ export default function CartPage() {
               <div className="space-y-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-600">
                 <p className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  Secure SSL Checkout &bull; Koko, Mintpay &amp; Bank Transfer
+                  Secure SSL Checkout &bull; Direct Bank Transfer
                 </p>
                 <p className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-[#F5A623]" />

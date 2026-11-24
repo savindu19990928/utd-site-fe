@@ -65,10 +65,10 @@ export default function AdminPaymentsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-extrabold text-slate-900">
-            Payment Audit &amp; Bank Slip Verification
+            Bank Transfer Verification &amp; Payment Audit
           </h1>
           <p className="text-sm text-slate-600">
-            Approve Direct Bank Transfers and verify Koko/Mintpay transaction logs.
+            Verify Direct Bank Transfer payments and audit refund records.
           </p>
         </div>
 
@@ -133,7 +133,12 @@ export default function AdminPaymentsPage() {
                         </p>
                       </td>
                       <td className="px-4 py-3 text-xs font-bold text-slate-800">
-                        {pay.method}
+                        <p>{pay.method}</p>
+                        {pay.bank_reference && (
+                          <p className="font-mono text-[11px] font-normal text-slate-500">
+                            Ref: {pay.bank_reference}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500">
                         {formatDateTimeDisplay(pay.created_at)}

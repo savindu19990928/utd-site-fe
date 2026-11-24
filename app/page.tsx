@@ -14,24 +14,40 @@ import {
 } from "lucide-react";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { ProductCard } from "@/components/catalog/ProductCard";
+import { RentalProductCard } from "@/components/rentals/RentalProductCard";
 import {
   getCachedCategories,
   getCachedProducts,
+  getCachedPublicRentalReviews,
   getCachedPublicReviews,
+  getCachedRentalCategories,
+  getCachedRentalProducts,
 } from "@/lib/catalog-server";
 import { getProductPrimaryImage, slugify } from "@/lib/format";
-import type { Product } from "@/lib/types";
+import type { Product, RentalProduct } from "@/lib/types";
 
 export default async function HomePage() {
-  const [categories, products, publicReviews] = await Promise.all([
+  const [
+    categories,
+    rentalCategories,
+    products,
+    rentalProducts,
+    publicReviews,
+    publicRentalReviews,
+  ] = await Promise.all([
     getCachedCategories(),
+    getCachedRentalCategories(),
     getCachedProducts(),
+    getCachedRentalProducts(),
     getCachedPublicReviews(),
+    getCachedPublicRentalReviews(),
   ]);
 
-  // Representative image per category from live catalog
+  // Representative image per Sale Category
   const categoryVisuals = categories.map((cat) => {
-    const match = products.find((p) => p.category === cat.id && getProductPrimaryImage(p));
+    const match = products.find(
+      (p) => p.category === cat.id && getProductPrimaryImage(p)
+    );
     return {
       ...cat,
       image: match ? getProductPrimaryImage(match) : null,
@@ -39,31 +55,59 @@ export default async function HomePage() {
     };
   });
 
-  // Featured For-Sale items (prioritize items with reviews or variants or high visual diversity)
-  const saleProducts = products.filter((p) => p.is_for_sale && p.is_available);
+  // Featured For-Sale items
+  const saleProducts = products.filter((p) => p.is_available);
   const featuredSale: Product[] = [
     ...saleProducts.filter((p) => p.reviews.length > 0 || p.variants.length > 0),
-    ...saleProducts.filter((p) => p.reviews.length === 0 && p.variants.length === 0),
+    ...saleProducts.filter(
+      (p) => p.reviews.length === 0 && p.variants.length === 0
+    ),
   ].slice(0, 8);
 
-  // Featured Equipment Rental Fleet (prioritize rent-only heavy demolition & hoist + top rental tools)
-  const rentalProducts = products.filter((p) => p.is_for_rent && p.is_available);
-  const featuredRentals: Product[] = [
-    ...rentalProducts.filter((p) => !p.is_for_sale),
-    ...rentalProducts.filter((p) => p.is_for_sale),
-  ].slice(0, 4);
-
-  const productNameById = new Map(products.map((p) => [p.id, p.name]));
-  const approvedReviews = publicReviews
-    .filter((r) => r.is_approved !== false && r.comment)
+  // Featured Rental Fleet (mix bulk stock & machine-numbered assets)
+  const availableRentals = rentalProducts.filter((p) => p.is_available);
+  const featuredRentals: RentalProduct[] = [
+    ...availableRentals.filter((p) => p.has_machine_numbers).slice(0, 3),
+    ...availableRentals.filter((p) => !p.has_machine_numbers).slice(0, 2),
+    ...availableRentals,
+  ]
+    .filter((item, index, arr) => arr.findIndex((x) => x.id === item.id) === index)
     .slice(0, 4);
+
+  const saleNameById = new Map(products.map((p) => [p.id, p.name]));
+  const rentalNameById = new Map(rentalProducts.map((p) => [p.id, p.name]));
+
+  const mergedReviews = [
+    ...publicReviews
+      .filter((r) => r.is_approved !== false && r.comment)
+      .map((r) => ({
+        key: `sale-${r.id}`,
+        href: `/product/${r.product}`,
+        rating: r.rating,
+        comment: r.comment,
+        title: saleNameById.get(r.product) || `Tool #${r.product}`,
+        label: "Verified Purchase",
+      })),
+    ...publicRentalReviews
+      .filter((r) => r.is_approved !== false && r.comment)
+      .map((r) => ({
+        key: `rent-${r.id}`,
+        href: `/rentals/${r.rental_product}`,
+        rating: r.rating,
+        comment: r.comment,
+        title:
+          rentalNameById.get(r.rental_product) ||
+          `Rental Equipment #${r.rental_product}`,
+        label: "Verified Equipment Rental",
+      })),
+  ].slice(0, 4);
 
   return (
     <div className="flex flex-col bg-[#F8FAFC]">
       {/* 1. Industrial Hero Carousel */}
       <HeroCarousel />
 
-      {/* 2. Shop by Category Strip (matching Homepage PNG) */}
+      {/* 2. Shop by Category Strip (Sale Categories) */}
       <section className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:py-10">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
@@ -111,7 +155,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 3. Featured For-Sale Equipment (matching Homepage PNG) */}
+      {/* 3. Featured For-Sale Equipment */}
       <section className="mx-auto w-full max-w-[1400px] px-4 py-4 sm:py-6">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -121,7 +165,7 @@ export default async function HomePage() {
             </h2>
           </div>
           <Link
-            href="/catalog?for_sale=true"
+            href="/catalog"
             className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-[#D97706] hover:text-amber-800"
           >
             View All Products
@@ -136,20 +180,20 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 4. Featured Equipment Rental Fleet */}
+      {/* 4. Separate Equipment Rental Fleet Section */}
       <section className="my-8 bg-slate-900 py-12 text-white">
         <div className="mx-auto max-w-[1400px] px-4">
-          <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-[#EA580C]/20 border border-[#EA580C]/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-orange-300 mb-2">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Short-Term &amp; Site Rental Fleet
+                Separate Rental Fleet &amp; Categories
               </div>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight">
                 Featured <span className="text-[#F5A623]">Rental Machinery</span>
               </h2>
               <p className="mt-1 text-sm text-slate-300 max-w-2xl">
-                Transparent daily rates with live calendar availability and a 100% refundable 10x security deposit upon return inspection.
+                Includes bulk stock gear (e.g. scaffolding clamps) and machine-numbered machinery (e.g. floor polishers) with live calendar availability and a 100% refundable 10x security deposit.
               </p>
             </div>
             <Link
@@ -161,9 +205,23 @@ export default async function HomePage() {
             </Link>
           </div>
 
+          {rentalCategories.length > 0 && (
+            <div className="mb-6 flex flex-wrap gap-2">
+              {rentalCategories.map((rc) => (
+                <Link
+                  key={rc.id}
+                  href={`/rentals/category/${slugify(rc.name)}`}
+                  className="rounded-full border border-slate-700 bg-slate-800/80 px-3.5 py-1.5 text-xs font-semibold text-slate-200 hover:border-[#EA580C] hover:text-white transition-colors"
+                >
+                  {rc.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {featuredRentals.map((product) => (
-              <ProductCard key={product.id} product={product} preferRent />
+              <RentalProductCard key={product.id} product={product} />
             ))}
           </div>
         </div>
@@ -232,7 +290,7 @@ export default async function HomePage() {
       </section>
 
       {/* 6. Verified Contractor Reviews */}
-      {approvedReviews.length > 0 && (
+      {mergedReviews.length > 0 && (
         <section className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-2">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -245,15 +303,15 @@ export default async function HomePage() {
               href="/catalog"
               className="text-xs sm:text-sm font-bold text-[#D97706] hover:underline"
             >
-              Browse Reviewed Equipment &rarr;
+              Browse Equipment &rarr;
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {approvedReviews.map((review) => (
+            {mergedReviews.map((review) => (
               <Link
-                key={review.id}
-                href={`/product/${review.product}`}
+                key={review.key}
+                href={review.href}
                 className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs hover:border-amber-400 transition-colors"
               >
                 <div>
@@ -276,10 +334,10 @@ export default async function HomePage() {
                 </div>
                 <div className="mt-4 border-t border-slate-100 pt-3">
                   <p className="text-xs font-bold text-slate-900 line-clamp-1">
-                    {productNameById.get(review.product) || `Tool #${review.product}`}
+                    {review.title}
                   </p>
                   <p className="text-[11px] font-medium text-emerald-700 mt-0.5">
-                    Verified Customer Purchase / Rental
+                    {review.label}
                   </p>
                 </div>
               </Link>

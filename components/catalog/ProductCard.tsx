@@ -4,19 +4,11 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  CalendarClock,
-  Heart,
-  ShoppingCart,
-  Star,
-  Wrench,
-} from "lucide-react";
+import { Heart, ShoppingCart, Star, Wrench } from "lucide-react";
 import { useStore } from "@/components/providers/StoreProvider";
 import {
-  DEPOSIT_MULTIPLIER,
   formatLKR,
   getBaseSalePrice,
-  getEffectiveRentalPrice,
   getEffectiveSalePrice,
   getEffectiveStock,
   getProductPrimaryImage,
@@ -27,14 +19,9 @@ import type { Product } from "@/lib/types";
 interface ProductCardProps {
   product: Product;
   view?: "grid" | "list";
-  preferRent?: boolean;
 }
 
-export function ProductCard({
-  product,
-  view = "grid",
-  preferRent = false,
-}: ProductCardProps) {
+export function ProductCard({ product, view = "grid" }: ProductCardProps) {
   const router = useRouter();
   const { addToCart, isWishlisted, toggleWishlist } = useStore();
 
@@ -44,8 +31,6 @@ export function ProductCard({
   const discountPct = parseFloat(product.discount ?? "0") || 0;
   const originalSale = getBaseSalePrice(product);
   const effectiveSale = getEffectiveSalePrice(product);
-  const dailyRental = getEffectiveRentalPrice(product);
-  const depositAmount = dailyRental * DEPOSIT_MULTIPLIER;
   const stockCount = getEffectiveStock(product);
   const inStock = product.is_available && stockCount > 0;
   const ratingStats = getProductRatingStats(product);
@@ -55,7 +40,6 @@ export function ProductCard({
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     if (hasVariants) {
-      // Navigate to PDP if variant selection is required (§8)
       router.push(`/product/${product.id}`);
       return;
     }
@@ -102,16 +86,6 @@ export function ProductCard({
                   <span className="font-mono text-[11px] text-slate-400">
                     {product.sku}
                   </span>
-                  {product.is_for_sale && (
-                    <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-800">
-                      FOR SALE
-                    </span>
-                  )}
-                  {product.is_for_rent && (
-                    <span className="rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                      FOR RENT
-                    </span>
-                  )}
                 </div>
                 <Link
                   href={`/product/${product.id}`}
@@ -157,35 +131,25 @@ export function ProductCard({
               <span className="text-slate-400">
                 ({ratingStats.count} {ratingStats.count === 1 ? "review" : "reviews"})
               </span>
-              <span className="ml-2 text-xs font-medium text-emerald-700">
+              <span
+                className={`ml-2 text-xs font-medium ${
+                  inStock ? "text-emerald-700" : "text-red-600"
+                }`}
+              >
                 {inStock ? `${stockCount} in stock` : "Out of stock"}
               </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-            <div className="flex flex-wrap items-baseline gap-4">
-              {product.is_for_sale && (
-                <div>
-                  <span className="text-lg font-extrabold text-slate-950">
-                    {formatLKR(effectiveSale, false)}
-                  </span>
-                  {discountPct > 0 && (
-                    <span className="ml-2 text-xs text-slate-400 line-through">
-                      {formatLKR(originalSale, false)}
-                    </span>
-                  )}
-                </div>
-              )}
-              {product.is_for_rent && (
-                <div className="text-xs">
-                  <span className="font-bold text-[#EA580C] text-sm">
-                    {formatLKR(dailyRental, false)} / day
-                  </span>
-                  <span className="ml-1.5 text-slate-500">
-                    (Deposit: {formatLKR(depositAmount, false)})
-                  </span>
-                </div>
+            <div>
+              <span className="text-lg font-extrabold text-slate-950">
+                {formatLKR(effectiveSale, false)}
+              </span>
+              {discountPct > 0 && (
+                <span className="ml-2 text-xs text-slate-400 line-through">
+                  {formatLKR(originalSale, false)}
+                </span>
               )}
             </div>
 
@@ -196,26 +160,15 @@ export function ProductCard({
               >
                 View Details
               </Link>
-              {product.is_for_rent && (
-                <Link
-                  href={`/product/${product.id}?tab=rent`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#EA580C] px-3.5 py-2 text-xs font-bold text-white hover:bg-orange-700"
-                >
-                  <CalendarClock className="h-3.5 w-3.5" />
-                  Book Rental
-                </Link>
-              )}
-              {product.is_for_sale && (
-                <button
-                  type="button"
-                  disabled={!inStock}
-                  onClick={handleQuickAdd}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#F5A623] px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-[#e09212] disabled:opacity-50"
-                >
-                  <ShoppingCart className="h-3.5 w-3.5" />
-                  {hasVariants ? "Select Option" : "Add to Cart"}
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={!inStock}
+                onClick={handleQuickAdd}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#F5A623] px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-[#e09212] disabled:opacity-50"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                {hasVariants ? "Select Option" : "Add to Cart"}
+              </button>
             </div>
           </div>
         </div>
@@ -223,7 +176,6 @@ export function ProductCard({
     );
   }
 
-  // Default Grid Card matching Catalog Showcase & Homepage PNGs
   return (
     <article className="group flex flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400/80 hover:shadow-md transition-all">
       {/* Top Badges + Wishlist */}
@@ -232,16 +184,6 @@ export function ProductCard({
           {discountPct > 0 && (
             <span className="inline-block w-fit rounded-md bg-[#F5A623] px-2 py-0.5 text-[11px] font-extrabold text-zinc-950 shadow-xs">
               -{Math.round(discountPct)}%
-            </span>
-          )}
-          {!product.is_for_sale && product.is_for_rent && (
-            <span className="inline-block w-fit rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
-              FOR RENT
-            </span>
-          )}
-          {product.is_for_sale && product.is_for_rent && preferRent && (
-            <span className="inline-block w-fit rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
-              RENT FLEET
             </span>
           )}
         </div>
@@ -260,7 +202,7 @@ export function ProductCard({
         </button>
 
         <Link
-          href={`/product/${product.id}${preferRent ? "?tab=rent" : ""}`}
+          href={`/product/${product.id}`}
           className="block relative h-full w-full"
         >
           {img ? (
@@ -303,13 +245,13 @@ export function ProductCard({
           </div>
 
           <Link
-            href={`/product/${product.id}${preferRent ? "?tab=rent" : ""}`}
+            href={`/product/${product.id}`}
             className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-snug text-slate-900 hover:text-[#D97706] transition-colors"
           >
             {product.name}
           </Link>
 
-          {/* Rating row matching PNG */}
+          {/* Rating row */}
           <div className="mt-1.5 flex items-center justify-center sm:justify-start gap-1 text-xs">
             <div className="flex items-center text-[#F5A623]">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -332,91 +274,34 @@ export function ProductCard({
           </div>
         </div>
 
-        {/* Pricing + CTAs */}
+        {/* Pricing + CTA */}
         <div className="mt-3 space-y-2.5">
-          {preferRent && product.is_for_rent ? (
-            <div>
-              <p className="text-base font-extrabold text-[#EA580C]">
-                {formatLKR(dailyRental, false)}{" "}
-                <span className="text-xs font-medium text-slate-500">/ day</span>
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Deposit: {formatLKR(depositAmount, false)} (100% Refundable)
-              </p>
-            </div>
-          ) : product.is_for_sale ? (
-            <div>
-              <div className="flex items-baseline justify-center sm:justify-start gap-2">
-                <span className="text-base font-extrabold text-slate-950">
-                  {formatLKR(effectiveSale, false)}
+          <div>
+            <div className="flex items-baseline justify-center sm:justify-start gap-2">
+              <span className="text-base font-extrabold text-slate-950">
+                {formatLKR(effectiveSale, false)}
+              </span>
+              {discountPct > 0 && (
+                <span className="text-xs text-slate-400 line-through">
+                  {formatLKR(originalSale, false)}
                 </span>
-                {discountPct > 0 && (
-                  <span className="text-xs text-slate-400 line-through">
-                    {formatLKR(originalSale, false)}
-                  </span>
-                )}
-              </div>
-              {product.is_for_rent && (
-                <p className="mt-0.5 text-[11px] font-medium text-[#EA580C]">
-                  Or rent from {formatLKR(dailyRental, false)}/day
-                </p>
               )}
             </div>
-          ) : (
-            <div>
-              <p className="text-base font-extrabold text-[#EA580C]">
-                {formatLKR(dailyRental, false)}{" "}
-                <span className="text-xs font-medium text-slate-500">/ day</span>
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Deposit: {formatLKR(depositAmount, false)}
-              </p>
-            </div>
-          )}
+          </div>
 
-          {preferRent && product.is_for_rent ? (
-            <Link
-              href={`/product/${product.id}?tab=rent`}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#EA580C] py-2.5 text-xs font-bold text-white hover:bg-orange-700 transition-colors shadow-xs"
-            >
-              <CalendarClock className="h-4 w-4" aria-hidden="true" />
-              Check Availability
-            </Link>
-          ) : product.is_for_sale ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={!inStock}
-                onClick={handleQuickAdd}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#F5A623] py-2.5 px-3 text-xs font-bold text-zinc-950 hover:bg-[#e09212] active:scale-[0.99] transition-all disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-              >
-                <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
-                {!inStock
-                  ? "Out of Stock"
-                  : hasVariants
-                  ? "Select Option"
-                  : "Add to Cart"}
-              </button>
-              {product.is_for_rent && (
-                <Link
-                  href={`/product/${product.id}?tab=rent`}
-                  title="Rent this tool"
-                  aria-label={`Rent ${product.name}`}
-                  className="flex items-center justify-center rounded-lg border border-orange-200 bg-orange-50 p-2.5 text-[#EA580C] hover:bg-orange-100 transition-colors"
-                >
-                  <CalendarClock className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              )}
-            </div>
-          ) : (
-            <Link
-              href={`/product/${product.id}?tab=rent`}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#EA580C] py-2.5 text-xs font-bold text-white hover:bg-orange-700 transition-colors"
-            >
-              <CalendarClock className="h-4 w-4" aria-hidden="true" />
-              Book Rental
-            </Link>
-          )}
+          <button
+            type="button"
+            disabled={!inStock}
+            onClick={handleQuickAdd}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#F5A623] py-2.5 px-3 text-xs font-bold text-zinc-950 hover:bg-[#e09212] active:scale-[0.99] transition-all disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
+            {!inStock
+              ? "Out of Stock"
+              : hasVariants
+              ? "Select Option"
+              : "Add to Cart"}
+          </button>
         </div>
       </div>
     </article>

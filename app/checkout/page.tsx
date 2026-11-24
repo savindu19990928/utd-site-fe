@@ -19,7 +19,7 @@ import { useStore } from "@/components/providers/StoreProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { api, ApiError } from "@/lib/api-client";
 import { formatLKR } from "@/lib/format";
-import type { Address, Coupon, PaymentMethod } from "@/lib/types";
+import type { Address, Coupon } from "@/lib/types";
 import { addressSchema, isValidLocationTag, SRI_LANKA_MOBILE_REGEX } from "@/lib/validation";
 
 export default function CheckoutPage() {
@@ -51,8 +51,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Payment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("KOKO");
+  // Payment (Direct Bank Transfer Only)
   const [bankSlipName, setBankSlipName] = useState("");
   const [bankRefNote, setBankRefNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -197,7 +196,7 @@ export default function CheckoutPage() {
         ...(appliedCoupon ? { coupon_code: appliedCoupon.code } : {}),
       });
 
-      const payment = await api.initiatePayment(order.id, paymentMethod);
+      const payment = await api.initiatePayment(order.id, "BANK_TRANSFER");
 
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(
@@ -246,7 +245,7 @@ export default function CheckoutPage() {
             Checkout &amp; Job-Site Delivery
           </h1>
           <p className="text-sm text-slate-600">
-            Select your saved delivery site, pin exact GPS coordinates, and choose your preferred Sri Lankan payment method.
+            Select your saved delivery site, pin exact GPS coordinates, and settle via Direct Bank Transfer.
           </p>
         </div>
 
@@ -453,14 +452,13 @@ export default function CheckoutPage() {
               </div>
             </section>
 
-            {/* 2. Payment Method */}
+            {/* 2. Payment Method (Direct Bank Transfer Only) */}
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
               <h2 className="font-display text-xl font-extrabold text-slate-900">
-                2. Payment Method
+                2. Direct Bank Transfer Payment
               </h2>
               <PaymentMethodSelector
-                selected={paymentMethod}
-                onSelect={setPaymentMethod}
+                selected="BANK_TRANSFER"
                 totalAmount={finalTotal}
                 bankSlipName={bankSlipName}
                 onBankSlipChange={setBankSlipName}

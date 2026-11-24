@@ -14,19 +14,21 @@ import {
   getEffectiveSalePrice,
   getEffectiveStock,
   getProductPrimaryImage,
+  toISODateInput,
 } from "@/lib/format";
 import type {
   Cart,
   GuestCartItem,
   Product,
   ProductVariant,
+  RentalProduct,
   WishlistItem,
 } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { useToast } from "./ToastProvider";
 
 const GUEST_CART_KEY = "utd_guest_cart_v1";
-const RENTAL_DRAFT_KEY = "utd_rental_draft_v1";
+const RENTAL_DRAFT_KEY = "utd_rental_draft_v2";
 
 export interface DisplayCartItem {
   id: string | number;
@@ -42,17 +44,23 @@ export interface DisplayCartItem {
   maxStock: number;
 }
 
-export interface RentalDraft {
-  productId: number;
-  variantId: number | null;
+export interface RentalDraftItem {
+  rentalProductId: number;
+  rentalVariantId: number | null;
   quantity: number;
+}
+
+export interface RentalDraft {
   startDate: string;
   endDate: string;
+  items: RentalDraftItem[];
 }
 
 interface StoreContextValue {
   productsById: Record<number, Product>;
   registerProducts: (products: Product[]) => void;
+  rentalProductsById: Record<number, RentalProduct>;
+  registerRentalProducts: (products: RentalProduct[]) => void;
   cartItems: DisplayCartItem[];
   cartCount: number;
   cartSubtotal: number;
@@ -76,6 +84,19 @@ interface StoreContextValue {
   refreshWishlist: () => Promise<void>;
   rentalDraft: RentalDraft | null;
   setRentalDraft: (draft: RentalDraft | null) => void;
+  addRentalDraftItem: (
+    item: RentalDraftItem,
+    dates?: { startDate: string; endDate: string }
+  ) => void;
+  updateRentalDraftItemQty: (
+    rentalProductId: number,
+    rentalVariantId: number | null,
+    quantity: number
+  ) => void;
+  removeRentalDraftItem: (
+    rentalProductId: number,
+    rentalVariantId: number | null
+  ) => void;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -105,12 +126,37 @@ function writeGuestCart(items: GuestCartItem[]) {
   }
 }
 
+function getDefaultRentalDates() {
+  const start = new Date();
+  const end = new Date();
+  end.setDate(end.getDate() + 2);
+  return {
+    startDate: toISODateInput(start),
+    endDate: toISODateInput(end),
+  };
+}
+
+function writeRentalDraftStorage(draft: RentalDraft | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!draft || draft.items.length === 0) {
+      window.sessionStorage.removeItem(RENTAL_DRAFT_KEY);
+    } else {
+      window.sessionStorage.setItem(RENTAL_DRAFT_KEY, JSON.stringify(draft));
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function StoreProvider({
   children,
   initialProducts = [],
+  initialRentalProducts = [],
 }: {
   children: React.ReactNode;
   initialProducts?: Product[];
+  initialRentalProducts?: RentalProduct[];
 }) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -119,6 +165,16 @@ export function StoreProvider({
     const map: Record<number, Product> = {};
     for (const p of initialProducts) {
       map[p.id] = p;
+    }
+    return map;
+  });
+
+  const [rentalProductsById, setRentalProductsById] = useState<
+    Record<number, RentalProduct>
+  >(() => {
+    const map: Record<number, RentalProduct> = {};
+    for (const rp of initialRentalProducts) {
+      map[rp.id] = rp;
     }
     return map;
   });
@@ -147,7 +203,22 @@ export function StoreProvider({
     });
   }, []);
 
-  // Ensure product catalog is loaded in background if not seeded
+  const registerRentalProducts = useCallback((list: RentalProduct[]) => {
+    if (!list || list.length === 0) return;
+    setRentalProductsById((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const rp of list) {
+        if (!next[rp.id] || next[rp.id].updated_at !== rp.updated_at) {
+          next[rp.id] = rp;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  // Ensure sale & rental catalogs are loaded in background if not seeded
   useEffect(() => {
     if (Object.keys(productsById).length === 0) {
       api
@@ -157,7 +228,16 @@ export function StoreProvider({
     }
   }, [productsById, registerProducts]);
 
-  // Hydrate guest cart & rental draft on mount asynchronously to satisfy react-hooks/set-state-in-effect
+  useEffect(() => {
+    if (Object.keys(rentalProductsById).length === 0) {
+      api
+        .listRentalProducts()
+        .then(registerRentalProducts)
+        .catch(() => {});
+    }
+  }, [rentalProductsById, registerRentalProducts]);
+
+  // Hydrate guest cart & rental draft on mount asynchronously
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => {
@@ -166,7 +246,12 @@ export function StoreProvider({
       if (typeof window !== "undefined") {
         try {
           const draftRaw = window.sessionStorage.getItem(RENTAL_DRAFT_KEY);
-          if (draftRaw) setRentalDraftState(JSON.parse(draftRaw));
+          if (draftRaw) {
+            const parsed = JSON.parse(draftRaw) as RentalDraft | null;
+            if (parsed && Array.isArray(parsed.items)) {
+              setRentalDraftState(parsed);
+            }
+          }
         } catch {
           // ignore
         }
@@ -178,15 +263,88 @@ export function StoreProvider({
   }, []);
 
   const setRentalDraft = useCallback((draft: RentalDraft | null) => {
-    setRentalDraftState(draft);
-    if (typeof window !== "undefined") {
-      if (draft) {
-        window.sessionStorage.setItem(RENTAL_DRAFT_KEY, JSON.stringify(draft));
-      } else {
-        window.sessionStorage.removeItem(RENTAL_DRAFT_KEY);
-      }
-    }
+    const normalized =
+      draft && Array.isArray(draft.items) && draft.items.length > 0 ? draft : null;
+    setRentalDraftState(normalized);
+    writeRentalDraftStorage(normalized);
   }, []);
+
+  const addRentalDraftItem = useCallback(
+    (
+      item: RentalDraftItem,
+      dates?: { startDate: string; endDate: string }
+    ) => {
+      setRentalDraftState((prev) => {
+        const defaults = getDefaultRentalDates();
+        const startDate = dates?.startDate || prev?.startDate || defaults.startDate;
+        const endDate = dates?.endDate || prev?.endDate || defaults.endDate;
+        const existingItems = prev?.items ?? [];
+        const idx = existingItems.findIndex(
+          (i) =>
+            i.rentalProductId === item.rentalProductId &&
+            i.rentalVariantId === item.rentalVariantId
+        );
+        const safeQty = Math.max(1, item.quantity);
+        let nextItems: RentalDraftItem[];
+        if (idx >= 0) {
+          nextItems = existingItems.map((entry, i) =>
+            i === idx ? { ...entry, quantity: safeQty } : entry
+          );
+        } else {
+          nextItems = [...existingItems, { ...item, quantity: safeQty }];
+        }
+        const nextDraft: RentalDraft = { startDate, endDate, items: nextItems };
+        writeRentalDraftStorage(nextDraft);
+        return nextDraft;
+      });
+    },
+    []
+  );
+
+  const updateRentalDraftItemQty = useCallback(
+    (
+      rentalProductId: number,
+      rentalVariantId: number | null,
+      quantity: number
+    ) => {
+      setRentalDraftState((prev) => {
+        if (!prev) return null;
+        const safeQty = Math.max(1, quantity);
+        const nextDraft: RentalDraft = {
+          ...prev,
+          items: prev.items.map((entry) =>
+            entry.rentalProductId === rentalProductId &&
+            entry.rentalVariantId === rentalVariantId
+              ? { ...entry, quantity: safeQty }
+              : entry
+          ),
+        };
+        writeRentalDraftStorage(nextDraft);
+        return nextDraft;
+      });
+    },
+    []
+  );
+
+  const removeRentalDraftItem = useCallback(
+    (rentalProductId: number, rentalVariantId: number | null) => {
+      setRentalDraftState((prev) => {
+        if (!prev) return null;
+        const remaining = prev.items.filter(
+          (entry) =>
+            !(
+              entry.rentalProductId === rentalProductId &&
+              entry.rentalVariantId === rentalVariantId
+            )
+        );
+        const nextDraft =
+          remaining.length > 0 ? { ...prev, items: remaining } : null;
+        writeRentalDraftStorage(nextDraft);
+        return nextDraft;
+      });
+    },
+    []
+  );
 
   const refreshCart = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -194,13 +352,14 @@ export function StoreProvider({
     try {
       const cart = await api.getCart();
       setServerCart(cart);
-      // Fetch any product metadata missing from productsById
       const missingIds = cart.items
         .map((i) => i.product)
         .filter((pid) => !productsById[pid]);
       if (missingIds.length > 0) {
         const fetched = await Promise.all(
-          [...new Set(missingIds)].map((pid) => api.getProduct(pid).catch(() => null))
+          [...new Set(missingIds)].map((pid) =>
+            api.getProduct(pid).catch(() => null)
+          )
         );
         registerProducts(fetched.filter((p): p is Product => Boolean(p)));
       }
@@ -224,7 +383,7 @@ export function StoreProvider({
     }
   }, [isAuthenticated]);
 
-  // Sync guest cart to server cart upon login (§5.2)
+  // Sync guest cart to server cart upon login
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
@@ -346,11 +505,6 @@ export function StoreProvider({
       openDrawer = true
     ) => {
       registerProducts([product]);
-
-      if (!product.is_for_sale) {
-        showToast("This equipment is available for rental only.", "warning");
-        return;
-      }
 
       const activeVariants = (product.variants ?? []).filter((v) => v.is_active);
       if (activeVariants.length > 0 && !variant) {
@@ -556,6 +710,8 @@ export function StoreProvider({
   const value: StoreContextValue = {
     productsById,
     registerProducts,
+    rentalProductsById,
+    registerRentalProducts,
     cartItems,
     cartCount,
     cartSubtotal,
@@ -574,6 +730,9 @@ export function StoreProvider({
     refreshWishlist,
     rentalDraft,
     setRentalDraft,
+    addRentalDraftItem,
+    updateRentalDraftItemQty,
+    removeRentalDraftItem,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

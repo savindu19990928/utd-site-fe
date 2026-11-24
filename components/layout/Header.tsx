@@ -34,15 +34,33 @@ import {
   getProductPrimaryImage,
   slugify,
 } from "@/lib/format";
-import type { Brand, Category, Product } from "@/lib/types";
+import type {
+  Brand,
+  Category,
+  Product,
+  RentalCategory,
+  RentalProduct,
+} from "@/lib/types";
 
 interface HeaderProps {
   categories: Category[];
+  rentalCategories: RentalCategory[];
   brands: Brand[];
   products: Product[];
+  rentalProducts: RentalProduct[];
 }
 
-export function Header({ categories, brands, products }: HeaderProps) {
+type SearchMatch =
+  | { kind: "sale"; item: Product }
+  | { kind: "rent"; item: RentalProduct };
+
+export function Header({
+  categories,
+  rentalCategories,
+  brands,
+  products,
+  rentalProducts,
+}: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -52,6 +70,8 @@ export function Header({ categories, brands, products }: HeaderProps) {
     wishlistItems,
     openCartDrawer,
     registerProducts,
+    registerRentalProducts,
+    rentalDraft,
   } = useStore();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -96,6 +116,10 @@ export function Header({ categories, brands, products }: HeaderProps) {
   }, [products, registerProducts]);
 
   useEffect(() => {
+    registerRentalProducts(rentalProducts);
+  }, [rentalProducts, registerRentalProducts]);
+
+  useEffect(() => {
     function handleOutside(e: MouseEvent) {
       const target = e.target as Node;
       if (searchRef.current && !searchRef.current.contains(target)) {
@@ -115,7 +139,7 @@ export function Header({ categories, brands, products }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  const categoryCounts = useMemo(() => {
+  const saleCategoryCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     for (const p of products) {
       if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
@@ -123,10 +147,18 @@ export function Header({ categories, brands, products }: HeaderProps) {
     return counts;
   }, [products]);
 
-  const searchResults = useMemo(() => {
+  const rentalCategoryCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const rp of rentalProducts) {
+      if (rp.category) counts[rp.category] = (counts[rp.category] || 0) + 1;
+    }
+    return counts;
+  }, [rentalProducts]);
+
+  const searchResults = useMemo<SearchMatch[]>(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
-    return products
+    const saleMatches: SearchMatch[] = products
       .filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
@@ -134,19 +166,40 @@ export function Header({ categories, brands, products }: HeaderProps) {
           (p.brand_name ?? "").toLowerCase().includes(q) ||
           (p.category_name ?? "").toLowerCase().includes(q)
       )
-      .slice(0, 6);
-  }, [products, searchQuery]);
+      .slice(0, 4)
+      .map((item) => ({ kind: "sale", item }));
+
+    const rentalMatches: SearchMatch[] = rentalProducts
+      .filter(
+        (rp) =>
+          rp.name.toLowerCase().includes(q) ||
+          rp.sku.toLowerCase().includes(q) ||
+          (rp.brand_name ?? "").toLowerCase().includes(q) ||
+          (rp.category_name ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, 4)
+      .map((item) => ({ kind: "rent", item }));
+
+    return [...saleMatches, ...rentalMatches].slice(0, 7);
+  }, [products, rentalProducts, searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (highlightedIdx >= 0 && searchResults[highlightedIdx]) {
+      const selectedMatch = searchResults[highlightedIdx];
       setSearchOpen(false);
-      router.push(`/product/${searchResults[highlightedIdx].id}`);
+      router.push(
+        selectedMatch.kind === "sale"
+          ? `/product/${selectedMatch.item.id}`
+          : `/rentals/${selectedMatch.item.id}`
+      );
       return;
     }
     const q = searchQuery.trim();
     setSearchOpen(false);
-    router.push(q ? `/catalog?search=${encodeURIComponent(q)}` : "/catalog");
+    const onRentals = pathname.startsWith("/rentals");
+    const base = onRentals ? "/rentals" : "/catalog";
+    router.push(q ? `${base}?search=${encodeURIComponent(q)}` : base);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,9 +238,11 @@ export function Header({ categories, brands, products }: HeaderProps) {
     { href: "/contact", label: "Contact Us", active: pathname === "/contact" },
   ];
 
+  const rentalDraftCount = rentalDraft?.items.length ?? 0;
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white shadow-sm">
-      {/* Top Dark Utility Bar (matches PNG header) */}
+      {/* Top Dark Utility Bar */}
       <div className="bg-[#141414] text-slate-200 border-b border-zinc-800">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-2 text-xs">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
@@ -370,7 +425,7 @@ export function Header({ categories, brands, products }: HeaderProps) {
             />
           </Link>
 
-          {/* Search Bar with Live Autocomplete */}
+          {/* Search Bar with Live Autocomplete across Sale & Rental Catalogs */}
           <div className="relative flex-1 max-w-2xl" ref={searchRef}>
             <form
               onSubmit={handleSearchSubmit}
@@ -388,7 +443,7 @@ export function Header({ categories, brands, products }: HeaderProps) {
                   if (searchQuery.trim()) setSearchOpen(true);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Search for tools, SKUs, or rental machinery..."
+                placeholder="Search tools to buy or machinery to rent (name, SKU, brand)..."
                 aria-label="Search for tools"
                 className="w-full bg-transparent px-4 sm:px-5 py-2 sm:py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
               />
@@ -405,18 +460,21 @@ export function Header({ categories, brands, products }: HeaderProps) {
               <div className="absolute left-0 right-0 top-full mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl z-50">
                 {searchResults.length === 0 ? (
                   <div className="px-4 py-6 text-center text-sm text-slate-500">
-                    No equipment matched &ldquo;{searchQuery}&rdquo;. Press Enter to search full catalog.
+                    No sale or rental equipment matched &ldquo;{searchQuery}&rdquo;. Press Enter to search full catalog.
                   </div>
                 ) : (
                   <ul role="listbox" className="divide-y divide-slate-100">
-                    {searchResults.map((item, idx) => {
+                    {searchResults.map((match, idx) => {
+                      const item = match.item;
                       const img = getProductPrimaryImage(item);
-                      const salePrice = getEffectiveSalePrice(item);
-                      const rentPrice = getEffectiveRentalPrice(item);
+                      const href =
+                        match.kind === "sale"
+                          ? `/product/${item.id}`
+                          : `/rentals/${item.id}`;
                       return (
-                        <li key={item.id}>
+                        <li key={`${match.kind}-${item.id}`}>
                           <Link
-                            href={`/product/${item.id}`}
+                            href={href}
                             onClick={() => setSearchOpen(false)}
                             className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
                               idx === highlightedIdx
@@ -438,24 +496,39 @@ export function Header({ categories, brands, products }: HeaderProps) {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-900">
-                                {item.name}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                                    match.kind === "sale"
+                                      ? "bg-amber-100 text-amber-900"
+                                      : "bg-orange-100 text-[#EA580C]"
+                                  }`}
+                                >
+                                  {match.kind === "sale" ? "BUY" : "RENT"}
+                                </span>
+                                {match.kind === "rent" && match.item.has_machine_numbers && (
+                                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                                    Machine #
+                                  </span>
+                                )}
+                                <p className="truncate text-sm font-semibold text-slate-900">
+                                  {item.name}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                                 <span className="font-mono">{item.sku}</span>
                                 <span>•</span>
                                 <span className="truncate">{item.category_name}</span>
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              {item.is_for_sale && (
+                              {match.kind === "sale" ? (
                                 <p className="text-sm font-bold text-slate-900">
-                                  {formatLKR(salePrice, false)}
+                                  {formatLKR(getEffectiveSalePrice(match.item), false)}
                                 </p>
-                              )}
-                              {item.is_for_rent && (
-                                <p className="text-[11px] font-semibold text-[#EA580C]">
-                                  Rent {formatLKR(rentPrice, false)}/d
+                              ) : (
+                                <p className="text-xs font-bold text-[#EA580C]">
+                                  {formatLKR(getEffectiveRentalPrice(match.item), false)}/day
                                 </p>
                               )}
                             </div>
@@ -463,13 +536,21 @@ export function Header({ categories, brands, products }: HeaderProps) {
                         </li>
                       );
                     })}
-                    <li className="bg-slate-50 px-4 py-2 text-center">
+                    <li className="bg-slate-50 px-4 py-2 flex items-center justify-center gap-4 text-xs font-semibold">
                       <Link
                         href={`/catalog?search=${encodeURIComponent(searchQuery.trim())}`}
                         onClick={() => setSearchOpen(false)}
-                        className="text-xs font-semibold text-amber-700 hover:text-amber-800"
+                        className="text-amber-700 hover:text-amber-800"
                       >
-                        View all results for &ldquo;{searchQuery.trim()}&rdquo; &rarr;
+                        Search Shop &rarr;
+                      </Link>
+                      <span className="text-slate-300">|</span>
+                      <Link
+                        href={`/rentals?search=${encodeURIComponent(searchQuery.trim())}`}
+                        onClick={() => setSearchOpen(false)}
+                        className="text-[#EA580C] hover:underline"
+                      >
+                        Search Rentals &rarr;
                       </Link>
                     </li>
                   </ul>
@@ -479,6 +560,19 @@ export function Header({ categories, brands, products }: HeaderProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            {rentalDraftCount > 0 && (
+              <Link
+                href="/rental-checkout"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-xs font-bold text-[#EA580C] hover:bg-orange-100 transition-colors"
+                title="Complete your pending multi-item rental booking"
+              >
+                <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
+                Rental Booking
+                <span className="rounded-full bg-[#EA580C] px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                  {rentalDraftCount}
+                </span>
+              </Link>
+            )}
             <Link
               href="/rentals"
               className="hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-[#EA580C] px-3.5 py-2 text-xs font-bold text-white hover:bg-orange-700 transition-colors shadow-xs"
@@ -498,11 +592,11 @@ export function Header({ categories, brands, products }: HeaderProps) {
         </div>
       </div>
 
-      {/* Sub Navigation Bar (All Categories + Home / Shop / Rentals / Brands / About Us / Contact Us + Phone) */}
+      {/* Sub Navigation Bar */}
       <div className="hidden md:block bg-white border-b border-slate-200">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-2">
           <div className="flex items-center gap-6">
-            {/* All Categories Mega Menu Trigger */}
+            {/* All Categories Mega Menu Trigger (Separate Sale & Rental Categories) */}
             <div className="relative" ref={catRef}>
               <button
                 type="button"
@@ -519,31 +613,67 @@ export function Header({ categories, brands, products }: HeaderProps) {
               </button>
 
               {catMenuOpen && (
-                <div className="absolute left-0 top-full mt-2 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl z-50">
-                  <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Equipment Categories
-                  </div>
-                  <div className="divide-y divide-slate-100">
-                    {categories.map((cat) => (
+                <div className="absolute left-0 top-full mt-2 w-[580px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl z-50 grid grid-cols-2 gap-4">
+                  {/* Selling Categories */}
+                  <div>
+                    <div className="px-2 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-800 border-b border-slate-100 mb-1">
+                      Shop Categories (Buy New)
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {categories.map((cat) => (
+                        <Link
+                          key={cat.id}
+                          href={`/catalog/category/${slugify(cat.name)}`}
+                          onClick={() => setCatMenuOpen(false)}
+                          className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium text-slate-800 hover:bg-amber-50 hover:text-amber-950 transition-colors"
+                        >
+                          <span className="truncate">{cat.name}</span>
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                            {saleCategoryCounts[cat.id] ?? 0}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="mt-2 border-t border-slate-100 pt-2 px-2">
                       <Link
-                        key={cat.id}
-                        href={`/catalog/category/${slugify(cat.name)}`}
-                        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 hover:bg-amber-50 hover:text-amber-950 transition-colors"
+                        href="/catalog"
+                        onClick={() => setCatMenuOpen(false)}
+                        className="text-xs font-bold text-[#D97706] hover:underline"
                       >
-                        <span className="truncate">{cat.name}</span>
-                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                          {categoryCounts[cat.id] ?? 0}
-                        </span>
+                        Browse Shop Catalog ({products.length}) &rarr;
                       </Link>
-                    ))}
+                    </div>
                   </div>
-                  <div className="mt-2 border-t border-slate-100 pt-2 px-3 pb-1">
-                    <Link
-                      href="/catalog"
-                      className="text-xs font-bold text-[#D97706] hover:underline"
-                    >
-                      Browse Full Catalog ({products.length} items) &rarr;
-                    </Link>
+
+                  {/* Separate Rental Categories */}
+                  <div className="border-l border-slate-100 pl-4">
+                    <div className="px-2 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-[#EA580C] border-b border-slate-100 mb-1">
+                      Rental Categories (Hire Fleet)
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {rentalCategories.map((rc) => (
+                        <Link
+                          key={rc.id}
+                          href={`/rentals/category/${slugify(rc.name)}`}
+                          onClick={() => setCatMenuOpen(false)}
+                          className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium text-slate-800 hover:bg-orange-50 hover:text-orange-950 transition-colors"
+                        >
+                          <span className="truncate">{rc.name}</span>
+                          <span className="ml-2 rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-[#EA580C]">
+                            {rentalCategoryCounts[rc.id] ?? 0}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="mt-2 border-t border-slate-100 pt-2 px-2">
+                      <Link
+                        href="/rentals"
+                        onClick={() => setCatMenuOpen(false)}
+                        className="text-xs font-bold text-[#EA580C] hover:underline"
+                      >
+                        Browse Rental Fleet ({rentalProducts.length}) &rarr;
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}
@@ -600,6 +730,7 @@ export function Header({ categories, brands, products }: HeaderProps) {
                       <Link
                         key={brand.id}
                         href={`/catalog/brand/${slugify(brand.name)}`}
+                        onClick={() => setBrandMenuOpen(false)}
                         className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-950"
                       >
                         {brand.name}
@@ -647,11 +778,22 @@ export function Header({ categories, brands, products }: HeaderProps) {
                 )}
               </Link>
             ))}
+            {rentalDraftCount > 0 && (
+              <Link
+                href="/rental-checkout"
+                className="flex items-center justify-between rounded-lg bg-orange-50 px-3 py-2.5 text-sm font-bold text-[#EA580C]"
+              >
+                <span>Active Rental Booking</span>
+                <span className="rounded-full bg-[#EA580C] px-2 py-0.5 text-[10px] text-white">
+                  {rentalDraftCount}
+                </span>
+              </Link>
+            )}
           </nav>
 
           <div>
             <p className="px-3 text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Categories
+              Shop Categories
             </p>
             <div className="grid grid-cols-2 gap-1.5">
               {categories.map((cat) => (
@@ -661,6 +803,23 @@ export function Header({ categories, brands, products }: HeaderProps) {
                   className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50 truncate"
                 >
                   {cat.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="px-3 text-xs font-bold uppercase tracking-wider text-[#EA580C] mb-2">
+              Rental Categories
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {rentalCategories.map((rc) => (
+                <Link
+                  key={rc.id}
+                  href={`/rentals/category/${slugify(rc.name)}`}
+                  className="rounded-lg border border-orange-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:border-orange-400 hover:bg-orange-50 truncate"
+                >
+                  {rc.name}
                 </Link>
               ))}
             </div>

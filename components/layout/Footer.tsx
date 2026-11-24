@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  Building2,
   Headphones,
   Mail,
   MapPin,
@@ -11,12 +12,18 @@ import {
   Truck,
 } from "lucide-react";
 import { slugify } from "@/lib/format";
-import type { Category } from "@/lib/types";
+import type { Category, RentalCategory } from "@/lib/types";
 
-export function Footer({ categories }: { categories: Category[] }) {
+export function Footer({
+  categories,
+  rentalCategories,
+}: {
+  categories: Category[];
+  rentalCategories: RentalCategory[];
+}) {
   return (
     <footer className="mt-auto bg-[#0F172A] text-slate-300 no-print">
-      {/* Bottom Trust Strip matching Catalog & About PNG mockups */}
+      {/* Bottom Trust Strip */}
       <div className="relative overflow-hidden bg-[#141414] border-t border-b border-zinc-800">
         <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-10 bg-[#F5A623] utd-diagonal-amber-left" />
         <div className="mx-auto flex max-w-[1400px] flex-col lg:flex-row items-center justify-between gap-6 px-4 lg:pl-14 lg:pr-0">
@@ -96,13 +103,13 @@ export function Footer({ categories }: { categories: Category[] }) {
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link href="/catalog?for_sale=true" className="hover:text-[#F5A623] transition-colors">
-                  Buy Equipment
+                <Link href="/catalog" className="hover:text-[#F5A623] transition-colors">
+                  Buy Equipment (Sales Catalog)
                 </Link>
               </li>
               <li>
                 <Link href="/rentals" className="hover:text-[#F5A623] transition-colors">
-                  Rent Heavy Equipment
+                  Rent Heavy Equipment (Rental Fleet)
                 </Link>
               </li>
               <li>
@@ -117,7 +124,7 @@ export function Footer({ categories }: { categories: Category[] }) {
               </li>
               <li>
                 <Link href="/terms-and-conditions#warranty" className="hover:text-[#F5A623] transition-colors">
-                  Warranty &amp; Refund Policy
+                  Warranty &amp; Bank Transfer Policy
                 </Link>
               </li>
               <li>
@@ -128,23 +135,43 @@ export function Footer({ categories }: { categories: Category[] }) {
             </ul>
           </div>
 
-          {/* Equipment Categories */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white mb-4">
-              Equipment Categories
-            </h3>
-            <ul className="space-y-2.5 text-sm">
-              {categories.slice(0, 6).map((cat) => (
-                <li key={cat.id}>
-                  <Link
-                    href={`/catalog/category/${slugify(cat.name)}`}
-                    className="hover:text-[#F5A623] transition-colors"
-                  >
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          {/* Separate Sale & Rental Categories */}
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white mb-2.5">
+                Shop Categories
+              </h3>
+              <ul className="space-y-1.5 text-xs">
+                {categories.slice(0, 4).map((cat) => (
+                  <li key={cat.id}>
+                    <Link
+                      href={`/catalog/category/${slugify(cat.name)}`}
+                      className="hover:text-[#F5A623] transition-colors"
+                    >
+                      {cat.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-[#EA580C] mb-2.5">
+                Rental Categories
+              </h3>
+              <ul className="space-y-1.5 text-xs">
+                {rentalCategories.slice(0, 4).map((rc) => (
+                  <li key={rc.id}>
+                    <Link
+                      href={`/rentals/category/${slugify(rc.name)}`}
+                      className="hover:text-[#F5A623] transition-colors"
+                    >
+                      {rc.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Customer Care */}
@@ -190,19 +217,19 @@ export function Footer({ categories }: { categories: Category[] }) {
           </div>
         </div>
 
-        {/* Accepted Payments & Copyright */}
+        {/* Accepted Payments & Copyright (Bank Transfer Only) */}
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 pt-6">
           <p className="text-xs text-slate-400">
-            &copy; 2026 Universal Tool Depot. Developed by <a href="https://www.devrious.lk">Devrious</a>
+            &copy; 2026 Universal Tool Depot. Developed by{" "}
+            <a href="https://www.devrious.lk" className="hover:text-[#F5A623]">
+              Devrious
+            </a>
           </p>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-            <span className="text-slate-500 font-normal mr-1">Accepted Payments:</span>
-            <span className="rounded bg-white px-2.5 py-1 text-pink-700">KOKO</span>
-            <span className="rounded bg-white px-2.5 py-1 text-indigo-700">Mintpay</span>
-            <span className="rounded bg-slate-800 border border-slate-700 px-2.5 py-1 text-slate-200">VISA</span>
-            <span className="rounded bg-slate-800 border border-slate-700 px-2.5 py-1 text-slate-200">Mastercard</span>
-            <span className="rounded bg-slate-800 border border-slate-700 px-2.5 py-1 text-amber-400">
-              Bank Transfer
+            <span className="text-slate-500 font-normal mr-1">Accepted Payment:</span>
+            <span className="inline-flex items-center gap-1.5 rounded bg-slate-800 border border-slate-700 px-3 py-1 text-amber-400">
+              <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Direct Bank Transfer (Commercial Bank)
             </span>
           </div>
         </div>

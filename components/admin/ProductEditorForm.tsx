@@ -29,22 +29,17 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
     brand: existingProduct?.brand ? String(existingProduct.brand) : "",
     description: existingProduct?.description ?? "",
     sale_price: existingProduct?.sale_price ?? "",
-    rental_price: existingProduct?.rental_price ?? "",
     discount: existingProduct?.discount ?? "0.00",
     stock: String(existingProduct?.stock ?? 10),
     warranty_information: existingProduct?.warranty_information ?? "",
     is_available: existingProduct?.is_available ?? true,
-    is_for_sale: existingProduct?.is_for_sale ?? true,
-    is_for_rent: existingProduct?.is_for_rent ?? false,
   });
 
-  // Sub-resource draft forms (available once product exists)
   const [variantDraft, setVariantDraft] = useState({
     name: "Packaging",
     value: "",
     sku: "",
     additional_price: "0.00",
-    additional_rental_price: "0.00",
     stock: "5",
   });
   const [specDraft, setSpecDraft] = useState({ name: "", value: "" });
@@ -69,28 +64,28 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
         category: form.category ? Number(form.category) : null,
         brand: form.brand ? Number(form.brand) : null,
         description: form.description,
-        sale_price: form.is_for_sale && form.sale_price ? form.sale_price : null,
-        rental_price: form.is_for_rent && form.rental_price ? form.rental_price : null,
+        sale_price: form.sale_price || "0.00",
         discount: form.discount || "0.00",
         stock: Number(form.stock) || 0,
         warranty_information: form.warranty_information || null,
         is_available: form.is_available,
-        is_for_sale: form.is_for_sale,
-        is_for_rent: form.is_for_rent,
       };
 
       if (product) {
         const updated = await api.updateProduct(product.id, payload);
         setProduct(updated);
-        showToast("Product details updated!", "success");
+        showToast("Sale product details updated!", "success");
       } else {
         const created = await api.createProduct(payload);
-        showToast("Product created! You can now add images, variants, and specs.", "success");
+        showToast(
+          "Sale product created! You can now add images, variants, and specs.",
+          "success"
+        );
         router.push(`/admin/products/${created.id}/edit`);
       }
     } catch (err) {
       showToast(
-        err instanceof ApiError ? err.message : "Failed to save product.",
+        err instanceof ApiError ? err.message : "Failed to save sale product.",
         "error"
       );
     } finally {
@@ -107,7 +102,6 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
         value: variantDraft.value,
         sku: variantDraft.sku || null,
         additional_price: variantDraft.additional_price || "0.00",
-        additional_rental_price: variantDraft.additional_rental_price || "0.00",
         stock: Number(variantDraft.stock) || 0,
         is_active: true,
       });
@@ -116,13 +110,15 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
         value: "",
         sku: "",
         additional_price: "0.00",
-        additional_rental_price: "0.00",
         stock: "5",
       });
       await refreshProduct(product.id);
-      showToast("Variant added.", "success");
+      showToast("Sale variant added.", "success");
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Could not add variant.", "error");
+      showToast(
+        err instanceof ApiError ? err.message : "Could not add variant.",
+        "error"
+      );
     }
   };
 
@@ -138,7 +134,10 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
       await refreshProduct(product.id);
       showToast("Specification added.", "success");
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Failed to add spec.", "error");
+      showToast(
+        err instanceof ApiError ? err.message : "Failed to add spec.",
+        "error"
+      );
     }
   };
 
@@ -155,7 +154,10 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
       await refreshProduct(product.id);
       showToast("Product image uploaded.", "success");
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Image upload failed.", "error");
+      showToast(
+        err instanceof ApiError ? err.message : "Image upload failed.",
+        "error"
+      );
     }
   };
 
@@ -167,7 +169,7 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
           className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-700 hover:text-slate-950"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Products
+          Back to Sale Catalog
         </Link>
         {product && (
           <Link
@@ -179,13 +181,13 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
         )}
       </div>
 
-      {/* Main Product Form */}
+      {/* Main Sale Product Form */}
       <form
         onSubmit={handleSaveMain}
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-5"
       >
         <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900">
-          {product ? `Edit: ${product.name}` : "Create New Equipment"}
+          {product ? `Edit Sale Product: ${product.name}` : "Create New Sale Product"}
         </h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -216,14 +218,14 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Category
+              Sale Category
             </label>
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="">Select Category</option>
+              <option value="">Select Sale Category</option>
               {categories.map((c) => (
                 <option key={c.id} value={String(c.id)}>
                   {c.name}
@@ -272,28 +274,17 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Sale Price (LKR)
+              Sale Price (LKR) *
             </label>
             <input
               type="text"
+              required
               value={form.sale_price}
               onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
               placeholder="45000.00"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Daily Rental (LKR)
-            </label>
-            <input
-              type="text"
-              value={form.rental_price}
-              onChange={(e) => setForm({ ...form, rental_price: e.target.value })}
-              placeholder="2500.00"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
@@ -331,25 +322,7 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
               onChange={(e) => setForm({ ...form, is_available: e.target.checked })}
               className="h-4 w-4 accent-[#F5A623]"
             />
-            Active / Available
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.is_for_sale}
-              onChange={(e) => setForm({ ...form, is_for_sale: e.target.checked })}
-              className="h-4 w-4 accent-[#F5A623]"
-            />
-            For Sale
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.is_for_rent}
-              onChange={(e) => setForm({ ...form, is_for_rent: e.target.checked })}
-              className="h-4 w-4 accent-[#EA580C]"
-            />
-            For Rent
+            Active / Available for Purchase
           </label>
         </div>
 
@@ -359,14 +332,13 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
           className="inline-flex items-center gap-2 rounded-xl bg-[#F5A623] px-6 py-3 text-sm font-extrabold text-zinc-950 hover:bg-[#e09212]"
         >
           <Save className="h-4 w-4" />
-          {saving ? "Saving..." : product ? "Save Product Changes" : "Create Product"}
+          {saving ? "Saving..." : product ? "Save Sale Product Changes" : "Create Sale Product"}
         </button>
       </form>
 
-      {/* Media, Variants & Specifications Panels (Available when editing) */}
+      {/* Media, Variants & Specifications Panels */}
       {product && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Images */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Product Photos</h2>
@@ -409,9 +381,8 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
             </div>
           </div>
 
-          {/* Variants */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-            <h2 className="text-base font-bold text-slate-900">Product Variants</h2>
+            <h2 className="text-base font-bold text-slate-900">Sale Variants</h2>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
@@ -445,7 +416,10 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
                 placeholder="+Sale Price"
                 value={variantDraft.additional_price}
                 onChange={(e) =>
-                  setVariantDraft({ ...variantDraft, additional_price: e.target.value })
+                  setVariantDraft({
+                    ...variantDraft,
+                    additional_price: e.target.value,
+                  })
                 }
                 className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
               />
@@ -490,7 +464,6 @@ export function ProductEditorForm({ existingProduct }: ProductEditorFormProps) {
             </div>
           </div>
 
-          {/* Specifications */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
             <h2 className="text-base font-bold text-slate-900">Technical Specs</h2>
             <div className="flex gap-2">

@@ -22,9 +22,10 @@ import { useToast } from "@/components/providers/ToastProvider";
 
 const ADMIN_NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/products", label: "Product Catalog", icon: Wrench },
+  { href: "/admin/products", label: "Sale Catalog", icon: Wrench },
+  { href: "/admin/rental-products", label: "Rental Catalog", icon: CalendarClock },
   { href: "/admin/orders", label: "Sales Orders", icon: ShoppingBag },
-  { href: "/admin/rentals", label: "Rental Fleet", icon: CalendarClock },
+  { href: "/admin/rentals", label: "Rental Bookings", icon: Package },
   { href: "/admin/payments", label: "Payments & Bank Slips", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons & Promos", icon: Tag },
   { href: "/admin/reviews", label: "Review Moderation", icon: MessageSquareCheck },

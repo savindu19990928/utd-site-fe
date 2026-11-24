@@ -168,11 +168,28 @@ export default function RentalsHistoryPage() {
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
-                  <div className="text-slate-600">
-                    {rental.items
-                      .map((i) => `${i.product_name || "Equipment"} ×${i.quantity}`)
-                      .join(", ")}{" "}
-                    &bull; Total: <strong className="text-slate-950">{formatLKR(rental.final_amount)}</strong>
+                  <div className="space-y-1.5 text-slate-600">
+                    <div>
+                      {rental.items
+                        .map((i) => `${i.product_name || "Equipment"} ×${i.quantity}`)
+                        .join(", ")}{" "}
+                      &bull; Total:{" "}
+                      <strong className="text-slate-950">
+                        {formatLKR(rental.final_amount)}
+                      </strong>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {rental.items.flatMap((i) =>
+                        (i.machine_numbers ?? []).map((num) => (
+                          <span
+                            key={`${i.id}-${num}`}
+                            className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-900"
+                          >
+                            {num}
+                          </span>
+                        ))
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3">

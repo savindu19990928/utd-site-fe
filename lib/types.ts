@@ -50,6 +50,10 @@ export interface RegisterPayload {
   password_confirm: string;
 }
 
+// ==========================================
+// Selling Catalog Types
+// ==========================================
+
 export interface Category {
   id: number;
   name: string;
@@ -67,8 +71,8 @@ export interface ProductVariant {
   value: string;
   sku: string | null;
   additional_price: string;
-  additional_rental_price: string;
   stock: number;
+  available_stock?: number;
   is_active: boolean;
   product: number;
 }
@@ -116,22 +120,19 @@ export interface Product {
   brand_name: string | null;
   sku: string;
   description: string;
-  sale_price: string | null;
-  rental_price: string | null;
+  sale_price: string;
   discount: string;
   is_available: boolean;
-  is_for_sale: boolean;
-  is_for_rent: boolean;
   stock: number;
   available_stock: number | string;
   warranty_information: string | null;
-  has_3d_model: boolean;
+  has_3d_model?: boolean;
   created_at: string;
   updated_at: string;
   variants: ProductVariant[];
   images: ProductImage[];
   specifications: ProductSpecification[];
-  threed_model: Product3DModel | null;
+  threed_model?: Product3DModel | null;
   reviews: ProductReview[];
 }
 
@@ -140,11 +141,124 @@ export interface ProductQueryParams {
   category?: number | string;
   brand?: number | string;
   is_available?: boolean;
-  is_for_sale?: boolean;
-  is_for_rent?: boolean;
-  has_3d_model?: boolean;
   ordering?: string;
 }
+
+// ==========================================
+// Separate Rental Catalog & Machine Types
+// ==========================================
+
+export interface RentalCategory {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
+export type RentalMachineStatus = "AVAILABLE" | "MAINTENANCE" | "RETIRED";
+
+export interface RentalMachine {
+  id: number;
+  rental_product: number;
+  variant: number | null;
+  machine_number: string;
+  status: RentalMachineStatus;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RentalProductVariant {
+  id: number;
+  rental_product: number;
+  name: string;
+  value: string;
+  sku: string | null;
+  additional_rental_price: string;
+  stock: number;
+  available_stock?: number;
+  is_active: boolean;
+}
+
+export interface RentalProductImage {
+  id: number;
+  image: string;
+  is_primary: boolean;
+  display_order: number;
+  rental_product: number;
+}
+
+export interface RentalProductSpecification {
+  id: number;
+  name: string;
+  value: string;
+  rental_product: number;
+}
+
+export interface RentalProductReview {
+  id: number;
+  rating: number;
+  comment: string | null;
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+  rental_product: number;
+  user: number;
+}
+
+export interface RentalProduct {
+  id: number;
+  name: string;
+  category: number | null;
+  category_name: string | null;
+  brand: number | null;
+  brand_name: string | null;
+  sku: string;
+  description: string;
+  rental_price: string;
+  discount: string;
+  is_available: boolean;
+  has_machine_numbers: boolean;
+  stock: number;
+  available_stock: number | string;
+  warranty_information: string | null;
+  has_3d_model?: boolean;
+  created_at: string;
+  updated_at: string;
+  variants: RentalProductVariant[];
+  images: RentalProductImage[];
+  specifications: RentalProductSpecification[];
+  threed_model?: Product3DModel | null;
+  reviews: RentalProductReview[];
+  machines?: RentalMachine[];
+}
+
+export interface RentalProductPayload {
+  name: string;
+  sku: string;
+  category: number | null;
+  brand: number | null;
+  description: string;
+  rental_price: string;
+  discount?: string;
+  is_available: boolean;
+  has_machine_numbers: boolean;
+  stock: number;
+  warranty_information?: string | null;
+  machine_numbers?: string[];
+}
+
+export interface RentalProductQueryParams {
+  search?: string;
+  category?: number | string;
+  brand?: number | string;
+  is_available?: boolean;
+  has_machine_numbers?: boolean;
+  ordering?: string;
+}
+
+// ==========================================
+// Cart & Wishlist
+// ==========================================
 
 export interface CartItem {
   id: number;
@@ -194,6 +308,10 @@ export interface Wishlist {
   created_at?: string;
 }
 
+// ==========================================
+// Coupons, Orders & Payments (Bank Transfer Only)
+// ==========================================
+
 export interface Coupon {
   id?: number;
   code: string;
@@ -226,9 +344,6 @@ export interface OrderItem {
   quantity: number;
   unit_price: string;
   subtotal: string;
-  rental_start_date?: string | null;
-  rental_end_date?: string | null;
-  rental_deposit?: string;
 }
 
 export interface Order {
@@ -240,8 +355,8 @@ export interface Order {
   created_at: string;
   updated_at: string;
   delivery_address: number | null;
-  delivery_location_tag: string | null;
-  house_number: string | null;
+  delivery_location_tag?: string | null;
+  house_number?: string | null;
   delivery_street: string | null;
   delivery_city: string | null;
   delivery_state: string | null;
@@ -252,7 +367,6 @@ export interface Order {
   final_amount: string;
   total_amount?: string;
   delivery_charge?: string;
-  total_rental_deposit?: string;
   coupon_code: string | null;
   coupon_discount_type: string | null;
   coupon_discount_value: string | null;
@@ -260,7 +374,7 @@ export interface Order {
   items: OrderItem[];
 }
 
-export type PaymentMethod = "KOKO" | "MINTPAY" | "BANK_TRANSFER";
+export type PaymentMethod = "BANK_TRANSFER";
 export type PaymentStatus =
   | "PENDING"
   | "SUCCESS"
@@ -272,7 +386,7 @@ export interface Payment {
   id: number;
   order: number;
   order_number: string;
-  method: PaymentMethod;
+  method: PaymentMethod | string;
   status: PaymentStatus;
   amount: string;
   transaction_id: string | null;
@@ -290,6 +404,15 @@ export interface Refund {
   created_at: string;
 }
 
+export interface CheckoutPayload {
+  address_id: number;
+  coupon_code?: string;
+}
+
+// ==========================================
+// Tool Rentals, Availability & Machine Assignment
+// ==========================================
+
 export type RentalStatus =
   | "PENDING"
   | "CONFIRMED"
@@ -297,18 +420,39 @@ export type RentalStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+export interface AvailableMachine {
+  id: number;
+  machine_number: string;
+}
+
+export interface RentalAvailabilityResponse {
+  available_quantity: number;
+  has_machine_numbers: boolean;
+  available_machines: AvailableMachine[];
+}
+
+export interface AssignedRentalMachine {
+  id: number;
+  machine: number;
+  machine_number: string;
+  assigned_at: string;
+}
+
 export interface RentalItem {
   id: number;
   rental: number;
-  product: number | null;
-  variant: number | null;
+  rental_product: number | null;
+  rental_variant: number | null;
   product_name: string | null;
   variant_name: string | null;
   sku: string | null;
+  has_machine_numbers: boolean;
   daily_rental_price: string;
   quantity: number;
   rental_days: number;
   line_total: string;
+  assigned_machines: AssignedRentalMachine[];
+  machine_numbers: string[];
 }
 
 export interface Rental {
@@ -337,8 +481,8 @@ export interface CreateRentalPayload {
   start_date: string;
   end_date: string;
   items: Array<{
-    product_id: number;
-    variant_id: number | null;
+    rental_product_id: number;
+    rental_variant_id: number | null;
     quantity: number;
   }>;
   delivery_street: string;
@@ -350,7 +494,8 @@ export interface CreateRentalPayload {
   customer_mobile: string;
 }
 
-export interface CheckoutPayload {
-  address_id: number;
-  coupon_code?: string;
+export interface AssignMachinesPayload {
+  rental_item_id: number;
+  machine_numbers?: string[];
+  machine_ids?: number[];
 }

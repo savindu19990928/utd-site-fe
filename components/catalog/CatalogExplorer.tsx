@@ -22,7 +22,6 @@ import { ProductCard } from "./ProductCard";
 import { useStore } from "@/components/providers/StoreProvider";
 import {
   formatLKR,
-  getEffectiveRentalPrice,
   getEffectiveSalePrice,
   getEffectiveStock,
 } from "@/lib/format";
@@ -34,7 +33,6 @@ interface CatalogExplorerProps {
   brands: Brand[];
   initialCategoryId?: number | null;
   initialBrandId?: number | null;
-  initialMode?: "all" | "sale" | "rent";
   initialSearch?: string;
   bannerTitle?: string;
   bannerHighlight?: string;
@@ -49,11 +47,10 @@ export function CatalogExplorer({
   brands,
   initialCategoryId = null,
   initialBrandId = null,
-  initialMode = "all",
   initialSearch = "",
   bannerTitle = "Our",
   bannerHighlight = "Catalog",
-  bannerSubtitle = "Explore our wide range of construction and DIY tools.",
+  bannerSubtitle = "Explore our wide range of construction and DIY tools for purchase.",
 }: CatalogExplorerProps) {
   const { registerProducts } = useStore();
   React.useEffect(() => {
@@ -62,9 +59,7 @@ export function CatalogExplorer({
 
   const maxCatalogPrice = useMemo(() => {
     const maxVal = products.reduce((m, p) => {
-      const s = getEffectiveSalePrice(p);
-      const r = getEffectiveRentalPrice(p);
-      return Math.max(m, s, r);
+      return Math.max(m, getEffectiveSalePrice(p));
     }, 100000);
     return Math.ceil(maxVal / 5000) * 5000;
   }, [products]);
@@ -75,7 +70,6 @@ export function CatalogExplorer({
   const [selectedBrandIds, setSelectedBrandIds] = useState<number[]>(
     initialBrandId ? [initialBrandId] : []
   );
-  const [listingMode, setListingMode] = useState<"all" | "sale" | "rent">(initialMode);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [minPrice, setMinPrice] = useState<number>(0);
   const [maxPrice, setMaxPrice] = useState<number>(maxCatalogPrice);
@@ -104,9 +98,6 @@ export function CatalogExplorer({
     const q = searchTerm.trim().toLowerCase();
 
     const list = products.filter((p) => {
-      if (listingMode === "sale" && !p.is_for_sale) return false;
-      if (listingMode === "rent" && !p.is_for_rent) return false;
-
       if (
         selectedCategoryIds.length > 0 &&
         (!p.category || !selectedCategoryIds.includes(p.category))
@@ -125,14 +116,8 @@ export function CatalogExplorer({
         return false;
       }
 
-      const referencePrice =
-        listingMode === "rent"
-          ? getEffectiveRentalPrice(p)
-          : p.is_for_sale
-          ? getEffectiveSalePrice(p)
-          : getEffectiveRentalPrice(p);
-
-      if (referencePrice < minPrice || referencePrice > maxPrice) {
+      const salePrice = getEffectiveSalePrice(p);
+      if (salePrice < minPrice || salePrice > maxPrice) {
         return false;
       }
 
@@ -154,13 +139,6 @@ export function CatalogExplorer({
       case "price_desc":
         sorted.sort((a, b) => getEffectiveSalePrice(b) - getEffectiveSalePrice(a));
         break;
-      case "rental_asc":
-        sorted.sort(
-          (a, b) =>
-            (getEffectiveRentalPrice(a) || Infinity) -
-            (getEffectiveRentalPrice(b) || Infinity)
-        );
-        break;
       case "newest":
         sorted.sort(
           (a, b) =>
@@ -176,7 +154,6 @@ export function CatalogExplorer({
     return sorted;
   }, [
     products,
-    listingMode,
     selectedCategoryIds,
     selectedBrandIds,
     inStockOnly,
@@ -211,7 +188,6 @@ export function CatalogExplorer({
   const clearAllFilters = () => {
     setSelectedCategoryIds([]);
     setSelectedBrandIds([]);
-    setListingMode(initialMode === "rent" ? "rent" : "all");
     setSearchTerm("");
     setMinPrice(0);
     setMaxPrice(maxCatalogPrice);
@@ -221,7 +197,6 @@ export function CatalogExplorer({
   const hasActiveFilters =
     selectedCategoryIds.length > 0 ||
     selectedBrandIds.length > 0 ||
-    listingMode !== "all" ||
     searchTerm.trim() !== "" ||
     minPrice > 0 ||
     maxPrice < maxCatalogPrice ||
@@ -229,13 +204,13 @@ export function CatalogExplorer({
 
   const FilterPanel = (
     <div className="space-y-5">
-      {/* Categories Card matching Catalog Showcase PNG */}
+      {/* Sale Categories Card */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
         <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4 text-slate-900" aria-hidden="true" />
             <h2 className="font-display text-lg font-extrabold text-slate-900">
-              Categories
+              Shop Categories
             </h2>
           </div>
           {selectedCategoryIds.length > 0 && (
@@ -292,33 +267,6 @@ export function CatalogExplorer({
             );
           })}
         </ul>
-      </div>
-
-      {/* Listing Mode Toggle */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Listing Mode
-        </h3>
-        <div className="grid grid-cols-3 gap-1.5 rounded-lg bg-slate-100 p-1">
-          {[
-            { id: "all", label: "All" },
-            { id: "sale", label: "For Sale" },
-            { id: "rent", label: "For Rent" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setListingMode(opt.id as "all" | "sale" | "rent")}
-              className={`rounded-md py-1.5 text-xs font-bold transition-colors ${
-                listingMode === opt.id
-                  ? "bg-[#F5A623] text-zinc-950 shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Brands */}
@@ -409,9 +357,7 @@ export function CatalogExplorer({
       {/* Availability Toggle */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
         <label className="flex items-center justify-between cursor-pointer">
-          <span className="text-sm font-medium text-slate-800">
-            In Stock / Available Fleet Only
-          </span>
+          <span className="text-sm font-medium text-slate-800">In Stock Only</span>
           <input
             type="checkbox"
             checked={inStockOnly}
@@ -420,12 +366,31 @@ export function CatalogExplorer({
           />
         </label>
       </div>
+
+      {/* Separate Rental Fleet Callout */}
+      <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
+        <div className="flex items-center gap-2 text-[#EA580C]">
+          <CalendarClock className="h-4 w-4" />
+          <p className="text-xs font-extrabold uppercase tracking-wider">
+            Need Equipment to Rent?
+          </p>
+        </div>
+        <p className="text-xs text-slate-700 leading-relaxed">
+          Rental machinery &amp; bulk scaffolding gear have their own dedicated catalog and categories.
+        </p>
+        <Link
+          href="/rentals"
+          className="inline-flex items-center gap-1 text-xs font-bold text-[#EA580C] hover:underline"
+        >
+          Browse Separate Rental Fleet &rarr;
+        </Link>
+      </div>
     </div>
   );
 
   return (
     <div className="flex flex-col bg-[#F8FAFC]">
-      {/* Diagonal Industrial Catalog Banner matching PNG */}
+      {/* Diagonal Industrial Catalog Banner */}
       <section className="relative overflow-hidden bg-[#141414] text-white">
         <div className="relative mx-auto max-w-[1400px] min-h-[190px] sm:min-h-[230px] flex items-center">
           <div className="absolute inset-0">
@@ -466,7 +431,6 @@ export function CatalogExplorer({
 
           {/* Right Product Grid & Controls */}
           <div className="lg:col-span-9 space-y-5">
-            {/* Heading + Sort + Grid/List Controls matching PNG */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900">
@@ -474,9 +438,7 @@ export function CatalogExplorer({
                     ? activeCategory.name
                     : activeBrand
                     ? `${activeBrand.name} Equipment`
-                    : listingMode === "rent"
-                    ? "Equipment Rental Fleet"
-                    : "All Tools & Machinery"}
+                    : "All Tools & Equipment for Sale"}
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-600">
                   {activeCategory?.description ||
@@ -508,7 +470,6 @@ export function CatalogExplorer({
                     <option value="newest">Newest First</option>
                     <option value="price_asc">Price: Low to High</option>
                     <option value="price_desc">Price: High to Low</option>
-                    <option value="rental_asc">Rental Rate: Low to High</option>
                     <option value="name_asc">Name: A to Z</option>
                   </select>
                 </div>
@@ -543,7 +504,7 @@ export function CatalogExplorer({
               </div>
             </div>
 
-            {/* Search Filter Bar & Active Filter Pills */}
+            {/* Search Filter Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -551,20 +512,18 @@ export function CatalogExplorer({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Filter catalog by name, SKU, or spec..."
+                  placeholder="Filter sale catalog by name, SKU, or spec..."
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 py-1.5 text-sm text-slate-900 focus:border-[#F5A623] focus:bg-white focus:outline-none"
                 />
               </div>
 
-              {listingMode === "rent" && (
-                <Link
-                  href="/terms-and-conditions#rental"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#EA580C] hover:underline"
-                >
-                  <CalendarClock className="h-4 w-4" />
-                  10x Refundable Deposit Policy Applies
-                </Link>
-              )}
+              <Link
+                href="/rentals"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#EA580C] hover:underline"
+              >
+                <CalendarClock className="h-4 w-4" />
+                Looking to hire? Switch to Rental Fleet &rarr;
+              </Link>
             </div>
 
             {hasActiveFilters && (
@@ -599,16 +558,6 @@ export function CatalogExplorer({
                     </button>
                   );
                 })}
-                {listingMode !== "all" && (
-                  <button
-                    type="button"
-                    onClick={() => setListingMode("all")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 border border-orange-300 px-3 py-1 text-xs font-bold text-orange-900"
-                  >
-                    Mode: {listingMode === "sale" ? "For Sale Only" : "For Rent Only"}
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
                 {inStockOnly && (
                   <button
                     type="button"
@@ -650,23 +599,13 @@ export function CatalogExplorer({
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    view="grid"
-                    preferRent={listingMode === "rent"}
-                  />
+                  <ProductCard key={product.id} product={product} view="grid" />
                 ))}
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    view="list"
-                    preferRent={listingMode === "rent"}
-                  />
+                  <ProductCard key={product.id} product={product} view="list" />
                 ))}
               </div>
             )}

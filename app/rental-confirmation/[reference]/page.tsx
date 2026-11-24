@@ -6,7 +6,9 @@ import { useParams, useSearchParams } from "next/navigation";
 import {
   CalendarClock,
   CheckCircle2,
+  Cpu,
   ExternalLink,
+  Layers,
   MapPin,
   Printer,
 } from "lucide-react";
@@ -28,9 +30,13 @@ export default function RentalConfirmationPage() {
 
   const reference = decodeURIComponent(params.reference || "");
   const idParam = searchParams.get("id");
-  const methodParam = searchParams.get("method") || "KOKO";
+  const methodParam = searchParams.get("method") || "BANK_TRANSFER";
 
   const [rental, setRental] = useState<Rental | null>(null);
+  const [extras, setExtras] = useState<{
+    bankSlipName?: string;
+    bankRefNote?: string;
+  }>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,7 +47,13 @@ export default function RentalConfirmationPage() {
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (mounted && parsed.rental) setRental(parsed.rental);
+            if (mounted && parsed.rental) {
+              setRental(parsed.rental);
+              setExtras({
+                bankSlipName: parsed.bankSlipName,
+                bankRefNote: parsed.bankRefNote,
+              });
+            }
           } catch {
             // ignore
           }
@@ -109,7 +121,9 @@ export default function RentalConfirmationPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             Rental Reference:{" "}
-            <span className="font-mono font-bold text-slate-950">{rental.reference}</span>
+            <span className="font-mono font-bold text-slate-950">
+              {rental.reference}
+            </span>
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2">
             <span
@@ -132,7 +146,8 @@ export default function RentalConfirmationPage() {
                 Universal Tool Depot — Rental Dispatch Receipt
               </h2>
               <p className="text-xs text-slate-500">
-                Created {formatDateTimeDisplay(rental.created_at)} &bull; Rental Period:{" "}
+                Created {formatDateTimeDisplay(rental.created_at)} &bull; Rental
+                Period:{" "}
                 <strong>
                   {formatDateDisplay(rental.start_date)} to{" "}
                   {formatDateDisplay(rental.end_date)}
@@ -141,7 +156,12 @@ export default function RentalConfirmationPage() {
             </div>
             <div className="text-right font-mono text-xs">
               <p className="font-bold text-slate-950">{rental.reference}</p>
-              <p className="text-slate-500">Method: {methodParam}</p>
+              <p className="text-slate-500">
+                Method:{" "}
+                {methodParam === "BANK_TRANSFER"
+                  ? "Direct Bank Transfer"
+                  : methodParam}
+              </p>
             </div>
           </div>
 
@@ -155,7 +175,8 @@ export default function RentalConfirmationPage() {
                 {rental.delivery_street}
               </p>
               <p className="text-slate-700">
-                {rental.delivery_city}, {rental.delivery_state} {rental.delivery_zip_code}
+                {rental.delivery_city}, {rental.delivery_state}{" "}
+                {rental.delivery_zip_code}
               </p>
               {rental.customer_mobile && (
                 <p className="text-slate-600">Site Mobile: {rental.customer_mobile}</p>
@@ -176,12 +197,27 @@ export default function RentalConfirmationPage() {
 
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1.5 text-amber-950">
               <p className="font-bold uppercase tracking-wider">
-                Security Deposit Refund Guarantee
+                Direct Bank Transfer &amp; 10x Deposit
+              </p>
+              <p className="font-bold text-slate-900">
+                Commercial Bank of Ceylon &bull; A/C 1000 8923 4510
               </p>
               <p>
-                Your 10x refundable deposit of{" "}
-                <strong>{formatLKR(rental.security_deposit)}</strong> is released immediately upon safe equipment return and depot inspection.
+                Transfer{" "}
+                <strong>{formatLKR(rental.final_amount)}</strong> quoting{" "}
+                <strong className="font-mono">{rental.reference}</strong>. Your
+                10x deposit of{" "}
+                <strong>{formatLKR(rental.security_deposit)}</strong> is
+                refunded immediately upon safe return inspection.
               </p>
+              {extras.bankRefNote && (
+                <p className="font-semibold">Ref Note: {extras.bankRefNote}</p>
+              )}
+              {extras.bankSlipName && (
+                <p className="font-semibold text-emerald-800">
+                  Slip attached: {extras.bankSlipName}
+                </p>
+              )}
             </div>
           </div>
 
@@ -189,7 +225,7 @@ export default function RentalConfirmationPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-900 text-left text-xs uppercase text-white">
                 <tr>
-                  <th className="px-4 py-3">Equipment</th>
+                  <th className="px-4 py-3">Equipment &amp; Assigned Machine #</th>
                   <th className="px-4 py-3 text-center">Qty</th>
                   <th className="px-4 py-3 text-center">Days</th>
                   <th className="px-4 py-3 text-right">Daily Rate</th>
@@ -197,26 +233,67 @@ export default function RentalConfirmationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {rental.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-slate-900">
-                        {item.product_name || `Equipment #${item.product}`}
-                      </p>
-                      <p className="font-mono text-xs text-slate-500">
-                        {item.sku} {item.variant_name ? `• ${item.variant_name}` : ""}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-center font-semibold">{item.quantity}</td>
-                    <td className="px-4 py-3 text-center">{item.rental_days}</td>
-                    <td className="px-4 py-3 text-right">
-                      {formatLKR(item.daily_rental_price)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold">
-                      {formatLKR(item.line_total)}
-                    </td>
-                  </tr>
-                ))}
+                {rental.items.map((item) => {
+                  const machineNums =
+                    item.machine_numbers?.length > 0
+                      ? item.machine_numbers
+                      : (item.assigned_machines ?? []).map(
+                          (m) => m.machine_number
+                        );
+                  return (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-900">
+                          {item.product_name ||
+                            `Rental Equipment #${item.rental_product ?? item.id}`}
+                        </p>
+                        <p className="font-mono text-xs text-slate-500">
+                          {item.sku}{" "}
+                          {item.variant_name ? `• ${item.variant_name}` : ""}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {item.has_machine_numbers ? (
+                            <>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-indigo-800">
+                                <Cpu className="h-3 w-3" />
+                                Assigned Machines:
+                              </span>
+                              {machineNums.length > 0 ? (
+                                machineNums.map((num) => (
+                                  <span
+                                    key={num}
+                                    className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-900"
+                                  >
+                                    {num}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[11px] text-slate-500">
+                                  Pending assignment
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                              <Layers className="h-3 w-3" />
+                              Bulk Stock (No Machine #)
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center font-semibold">
+                        {item.quantity}
+                      </td>
+                      <td className="px-4 py-3 text-center">{item.rental_days}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatLKR(item.daily_rental_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold">
+                        {formatLKR(item.line_total)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

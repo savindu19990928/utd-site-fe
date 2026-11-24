@@ -8,16 +8,16 @@ This document provides complete API reference documentation for the **Universal 
 1. [Overview & Authentication](#1-overview--authentication)
 2. [Authentication Endpoints](#2-authentication-endpoints)
 3. [User & Address Management](#3-user--address-management)
-4. [Catalog & Products](#4-catalog--products)
-   - [Categories & Brands](#41-categories--brands)
-   - [Products](#42-products)
+4. [Selling Catalog & Products](#4-catalog--products)
+   - [Sale Categories & Brands](#41-categories--brands)
+   - [Sale Products](#42-products)
    - [Product Variants, Images, Specifications & 3D Models](#43-product-variants-images-specifications--3d-models)
    - [Product Reviews](#44-product-reviews)
 5. [Coupons & Promotions](#5-coupons--promotions)
 6. [Shopping Cart & Wishlist](#6-shopping-cart--wishlist)
 7. [Checkout & Orders](#7-checkout--orders)
 8. [Payments & Refunds](#8-payments--refunds)
-9. [Tool Rentals](#9-tool-rentals)
+9. [Rental Catalog, Machine Numbers & Tool Rentals](#9-tool-rentals)
 10. [Interactive API Explorer Links](#10-interactive-api-explorer-links)
 
 ---
@@ -372,22 +372,21 @@ Content-Type: application/json
 
 ### 4.2 Products
 
-#### 4.2.1 List Products
+#### 4.2.1 List Sale Products
 - **Method**: `GET`
 - **Endpoint**: `/api/products/`
-- **Summary**: List products with optional search, sorting, and category/brand filters.
+- **Summary**: List selling products with optional search, sorting, and category/brand filters. (Rental items live separately under `/api/rental-products/`).
 - **Query Parameters**:
   - `search`: Filter by name, description, SKU.
-  - `category`: Category ID.
+  - `category`: Sale Category ID.
   - `brand`: Brand ID.
   - `is_available`: `true` or `false`.
-  - `is_for_sale`: `true` or `false`.
-  - `is_for_rent`: `true` or `false`.
-  - `ordering`: `sale_price`, `-sale_price`, `rental_price`, `created_at`, `name`.
+  - `has_3d_model`: `true` or `false`.
+  - `ordering`: `sale_price`, `-sale_price`, `created_at`, `name`.
 
 #### Example Request
 ```http
-GET /api/products/?category=1&is_for_rent=true&ordering=-created_at HTTP/1.1
+GET /api/products/?category=1&ordering=-created_at HTTP/1.1
 ```
 
 #### Example Response (`200 OK`)
@@ -403,11 +402,8 @@ GET /api/products/?category=1&is_for_rent=true&ordering=-created_at HTTP/1.1
     "sku": "BOSCH-GBH-226",
     "description": "High performance 800W corded SDS-plus hammer drill.",
     "sale_price": "45000.00",
-    "rental_price": "2500.00",
     "discount": "5.00",
     "is_available": true,
-    "is_for_sale": true,
-    "is_for_rent": true,
     "stock": 15,
     "available_stock": 15,
     "warranty_information": "1 Year Manufacturer Warranty",
@@ -447,7 +443,7 @@ GET /api/products/?category=1&is_for_rent=true&ordering=-created_at HTTP/1.1
 
 ---
 
-#### 4.2.2 Create Product (Admin Only)
+#### 4.2.2 Create Sale Product (Admin Only)
 - **Method**: `POST`
 - **Endpoint**: `/api/products/`
 - **Headers**:
@@ -467,11 +463,8 @@ Content-Type: application/json
   "sku": "DEW-DCG412",
   "description": "Ergonomic 20V brushless angle grinder.",
   "sale_price": "38500.00",
-  "rental_price": "1800.00",
   "discount": "0.00",
   "is_available": true,
-  "is_for_sale": true,
-  "is_for_rent": true,
   "stock": 8,
   "warranty_information": "2 Years Limited Warranty",
   "has_3d_model": false
@@ -490,11 +483,8 @@ Content-Type: application/json
   "sku": "DEW-DCG412",
   "description": "Ergonomic 20V brushless angle grinder.",
   "sale_price": "38500.00",
-  "rental_price": "1800.00",
   "discount": "0.00",
   "is_available": true,
-  "is_for_sale": true,
-  "is_for_rent": true,
   "stock": 8,
   "available_stock": 8,
   "warranty_information": "2 Years Limited Warranty",
@@ -524,7 +514,6 @@ Content-Type: application/json
   "value": "With 2x 5Ah Batteries",
   "sku": "DEW-DCG412-2BAT",
   "additional_price": "12000.00",
-  "additional_rental_price": "500.00",
   "stock": 5,
   "is_active": true
 }
@@ -913,7 +902,7 @@ Content-Type: application/json
 - **Method**: `POST`
 - **Endpoint**: `/api/payments/initiate/`
 - **Summary**: Initiate payment for an unpaid order. Amount is automatically derived from the order (cannot be manipulated by customer).
-- **Available Methods**: `KOKO`, `MINTPAY`, `BANK_TRANSFER`
+- **Available Methods**: `BANK_TRANSFER` (`Direct Bank Payment` only; optional, defaults to `BANK_TRANSFER`)
 - **Headers**:
   - `Authorization: Bearer <access_token>`
   - `Content-Type: application/json`
@@ -926,7 +915,7 @@ Content-Type: application/json
 
 {
   "order_id": 101,
-  "method": "KOKO"
+  "method": "BANK_TRANSFER"
 }
 ```
 
@@ -936,7 +925,7 @@ Content-Type: application/json
   "id": 50,
   "order": 101,
   "order_number": "ORD-20261106-0001",
-  "method": "KOKO",
+  "method": "BANK_TRANSFER",
   "status": "PENDING",
   "amount": "76950.00",
   "transaction_id": "TXN-20261106-50",
@@ -947,10 +936,10 @@ Content-Type: application/json
 
 ---
 
-### 8.2 Process Payment Result (Admin / Gateway Webhook Simulation)
+### 8.2 Process Payment Result (Admin Verification)
 - **Method**: `POST`
 - **Endpoint**: `/api/payments/{id}/process/`
-- **Summary**: Simulates payment gateway response. Transitions payment status and updates the corresponding order status (e.g. to `CONFIRMED` on `SUCCESS`).
+- **Summary**: Transitions payment status and updates the corresponding order status (e.g. to `CONFIRMED` on `SUCCESS`).
 - **Allowed Results**: `SUCCESS`, `FAILED`, `CANCELLED`
 - **Headers**:
   - `Authorization: Bearer <admin_token>`
@@ -972,7 +961,7 @@ Content-Type: application/json
 {
   "id": 50,
   "order": 101,
-  "method": "KOKO",
+  "method": "BANK_TRANSFER",
   "status": "SUCCESS",
   "amount": "76950.00",
   "transaction_id": "TXN-20261106-50",
@@ -1007,40 +996,72 @@ Content-Type: application/json
 
 ## 9. Tool Rentals
 
-### 9.1 Check Rental Availability
+Rental products and categories are completely separate from selling products and categories.
+- **Bulk Stock Rental Products** (`has_machine_numbers: false`, the default): tracked by stock count only (e.g., 20 scaffolding clamps).
+- **Machine-Numbered Rental Products** (`has_machine_numbers: true`): each stock unit is a `RentalMachine` with an alphanumeric `machine_number` (e.g., `RFP-0001`, `RFP-0002`). Bookings auto-assign available machines for the requested dates, and admins can reassign machines prior to dispatch.
+
+### 9.1 Rental Catalog Endpoints
+- **Rental Categories**: `GET/POST/PUT/PATCH/DELETE /api/rental-categories/` (Public read, Admin write)
+- **Rental Products**: `GET/POST/PUT/PATCH/DELETE /api/rental-products/` (Public read, Admin write; admins also receive `machines` and can supply `machine_numbers` on create/update)
+  - Query params: `category`, `brand`, `is_available`, `has_machine_numbers`, `has_3d_model`, `search`, `ordering` (`rental_price`, `created_at`, `name`)
+- **Rental Product Variants**: `/api/rental-product-variants/` (Public read, Admin write)
+- **Rental Product Images**: `/api/rental-product-images/` (Public read, Admin write)
+- **Rental Product Specifications**: `/api/rental-product-specifications/` (Public read, Admin write)
+- **Rental Product 3D Models**: `/api/rental-product-3d-models/` (Public read, Admin write)
+- **Rental Product Reviews**: `/api/rental-product-reviews/` (Approved public read, authenticated create, owner/admin modify)
+
+### 9.2 Rental Machines (Admin Only)
+- **List / Create / Retrieve / Update / Delete**: `/api/rental-machines/`
+  - Query params: `rental_product`, `variant`, `status` (`AVAILABLE`, `MAINTENANCE`, `RETIRED`), `search`, `ordering`
+- **Bulk Create Machines**: `POST /api/rental-machines/bulk-create/`
+  ```json
+  {
+    "rental_product": 2,
+    "variant": null,
+    "machine_numbers": ["RFP-0001", "RFP-0002", "RFP-0003"],
+    "status": "AVAILABLE"
+  }
+  ```
+
+### 9.3 Check Rental Availability
 - **Method**: `GET`
 - **Endpoint**: `/api/rentals/availability/`
-- **Summary**: Check available units of a product (or variant) for a specific date range prior to booking.
+- **Summary**: Check available units (and available machine numbers when `has_machine_numbers=true`) for a date range prior to booking.
 - **Query Parameters**:
-  - `product_id`: (Required) ID of the product.
-  - `variant_id`: (Optional) ID of the variant.
+  - `rental_product_id`: (Required) ID of the `RentalProduct`.
+  - `rental_variant_id`: (Optional) ID of the `RentalProductVariant`.
   - `start_date`: (Required) Format `YYYY-MM-DD`.
   - `end_date`: (Required) Format `YYYY-MM-DD`.
 
 #### Example Request
 ```http
-GET /api/rentals/availability/?product_id=10&start_date=2026-11-10&end_date=2026-11-15 HTTP/1.1
+GET /api/rentals/availability/?rental_product_id=2&start_date=2026-11-10&end_date=2026-11-15 HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 
 #### Example Response (`200 OK`)
 ```json
 {
-  "available_quantity": 4
+  "available_quantity": 2,
+  "has_machine_numbers": true,
+  "available_machines": [
+    { "id": 1, "machine_number": "RFP-0001" },
+    { "id": 2, "machine_number": "RFP-0002" }
+  ]
 }
 ```
 
 ---
 
-### 9.2 Create Rental Booking
+### 9.4 Create Rental Booking
 - **Method**: `POST`
 - **Endpoint**: `/api/rentals/`
-- **Summary**: Create a multi-day equipment rental reservation with deposit calculations and delivery snapshot.
+- **Summary**: Create a multi-day equipment rental reservation (supporting both bulk stock items and machine-numbered items in the same booking). Machine numbers are auto-assigned by the server when `has_machine_numbers=true`.
 - **Headers**:
   - `Authorization: Bearer <access_token>`
   - `Content-Type: application/json`
 
-#### Example Request
+#### Example Request (20 Clamps without machine numbers + 2 Floor Polishers with machine numbers)
 ```http
 POST /api/rentals/ HTTP/1.1
 Authorization: Bearer <access_token>
@@ -1051,9 +1072,14 @@ Content-Type: application/json
   "end_date": "2026-11-14",
   "items": [
     {
-      "product_id": 10,
-      "variant_id": null,
-      "quantity": 1
+      "rental_product_id": 1,
+      "rental_variant_id": null,
+      "quantity": 20
+    },
+    {
+      "rental_product_id": 2,
+      "rental_variant_id": null,
+      "quantity": 2
     }
   ],
   "delivery_street": "45 Park Lane",
@@ -1068,14 +1094,14 @@ Content-Type: application/json
 ```json
 {
   "id": 12,
-  "reference": "RNT-20261106-0001",
+  "reference": "RNT-9A4C2B10",
   "customer": 1,
   "status": "PENDING",
   "start_date": "2026-11-10",
   "end_date": "2026-11-14",
-  "subtotal": "12500.00",
-  "security_deposit": "25000.00",
-  "final_amount": "37500.00",
+  "subtotal": "50000.00",
+  "security_deposit": "100000.00",
+  "final_amount": "150000.00",
   "delivery_street": "45 Park Lane",
   "delivery_city": "Kandy",
   "delivery_state": "Central",
@@ -1089,15 +1115,37 @@ Content-Type: application/json
     {
       "id": 18,
       "rental": 12,
-      "product": 10,
-      "variant": null,
-      "product_name": "Bosch Rotary Hammer Drill 800W",
+      "rental_product": 1,
+      "rental_variant": null,
+      "product_name": "Heavy-Duty Scaffolding Clamps",
       "variant_name": null,
-      "sku": "BOSCH-GBH-226",
-      "daily_rental_price": "2500.00",
-      "quantity": 1,
+      "sku": "UDT-RN-CLM-01",
+      "has_machine_numbers": false,
+      "daily_rental_price": "150.00",
+      "quantity": 20,
       "rental_days": 5,
-      "line_total": "12500.00"
+      "line_total": "15000.00",
+      "assigned_machines": [],
+      "machine_numbers": []
+    },
+    {
+      "id": 19,
+      "rental": 12,
+      "rental_product": 2,
+      "rental_variant": null,
+      "product_name": "Industrial 17-Inch Floor Polisher",
+      "variant_name": null,
+      "sku": "UDT-RN-FP-01",
+      "has_machine_numbers": true,
+      "daily_rental_price": "3500.00",
+      "quantity": 2,
+      "rental_days": 5,
+      "line_total": "35000.00",
+      "assigned_machines": [
+        { "id": 1, "machine": 1, "machine_number": "RFP-0001", "assigned_at": "2026-11-06T00:58:00Z" },
+        { "id": 2, "machine": 2, "machine_number": "RFP-0002", "assigned_at": "2026-11-06T00:58:00Z" }
+      ],
+      "machine_numbers": ["RFP-0001", "RFP-0002"]
     }
   ]
 }
@@ -1105,10 +1153,32 @@ Content-Type: application/json
 
 ---
 
-### 9.3 Cancel Rental
+### 9.5 Reassign Rental Machines (Admin Only)
+- **Method**: `POST`
+- **Endpoint**: `/api/rentals/{id}/assign-machines/`
+- **Summary**: Reassign specific machine numbers (via `machine_numbers` or `machine_ids`) on a `PENDING` or `CONFIRMED` rental item before dispatch.
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+  - `Content-Type: application/json`
+
+#### Example Request
+```http
+POST /api/rentals/12/assign-machines/ HTTP/1.1
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "rental_item_id": 19,
+  "machine_numbers": ["RFP-0001", "RFP-0003"]
+}
+```
+
+---
+
+### 9.6 Cancel Rental
 - **Method**: `POST`
 - **Endpoint**: `/api/rentals/{id}/cancel/`
-- **Summary**: Cancel a pending or confirmed rental reservation.
+- **Summary**: Cancel a pending or confirmed rental reservation (frees reserved stock and assigned machines for other bookings).
 - **Headers**:
   - `Authorization: Bearer <access_token>`
 
@@ -1116,18 +1186,18 @@ Content-Type: application/json
 ```json
 {
   "id": 12,
-  "reference": "RNT-20261106-0001",
+  "reference": "RNT-9A4C2B10",
   "status": "CANCELLED",
-  "final_amount": "37500.00"
+  "final_amount": "150000.00"
 }
 ```
 
 ---
 
-### 9.4 Change Rental Status (Admin Only)
+### 9.7 Change Rental Status (Admin Only)
 - **Method**: `POST`
 - **Endpoint**: `/api/rentals/{id}/status/`
-- **Summary**: Transition rental through valid lifecycle states (`CONFIRMED`, `ACTIVE`, `COMPLETED`, `CANCELLED`).
+- **Summary**: Transition rental through valid lifecycle states (`CONFIRMED`, `ACTIVE`, `COMPLETED`, `CANCELLED`). Moving to `ACTIVE` verifies all assigned machines are `AVAILABLE`.
 - **Headers**:
   - `Authorization: Bearer <admin_token>`
   - `Content-Type: application/json`
@@ -1147,7 +1217,8 @@ Content-Type: application/json
 ```json
 {
   "id": 12,
-  "reference": "RNT-20261106-0001",
+  "reference": "RNT-9A4C2B10",
   "status": "ACTIVE"
 }
 ```
+

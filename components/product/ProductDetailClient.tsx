@@ -3,19 +3,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import {
-  AlertCircle,
-  CalendarClock,
-  CheckCircle2,
   ChevronRight,
   Heart,
-  Info,
   Minus,
   Plus,
   ShieldCheck,
   ShoppingCart,
   Star,
+  Truck,
   Wrench,
   X,
   ZoomIn,
@@ -25,18 +21,13 @@ import { useStore } from "@/components/providers/StoreProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { api, ApiError } from "@/lib/api-client";
 import {
-  calculateRentalBreakdown,
-  countRentalDays,
-  DEPOSIT_MULTIPLIER,
   formatDateDisplay,
   formatLKR,
   getBaseSalePrice,
-  getEffectiveRentalPrice,
   getEffectiveSalePrice,
   getEffectiveStock,
   getProductRatingStats,
   slugify,
-  toISODateInput,
 } from "@/lib/format";
 import type { Product, ProductReview, ProductVariant } from "@/lib/types";
 
@@ -47,11 +38,8 @@ export function ProductDetailClient({
   product: Product;
   relatedProducts: Product[];
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated, user } = useAuth();
-  const { addToCart, isWishlisted, toggleWishlist, setRentalDraft, registerProducts } =
-    useStore();
+  const { addToCart, isWishlisted, toggleWishlist, registerProducts } = useStore();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -78,36 +66,13 @@ export function ProductDetailClient({
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const defaultActionTab: "buy" | "rent" =
-    searchParams.get("tab") === "rent" && product.is_for_rent
-      ? "rent"
-      : product.is_for_sale
-      ? "buy"
-      : "rent";
-  const [actionTab, setActionTab] = useState<"buy" | "rent">(defaultActionTab);
-
   // Purchase state
   const [buyQty, setBuyQty] = useState(1);
 
-  // Rental state
-  const todayISO = useMemo(() => toISODateInput(new Date()), []);
-  const defaultEndISO = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return toISODateInput(d);
-  }, []);
-
-  const [startDate, setStartDate] = useState(todayISO);
-  const [endDate, setEndDate] = useState(defaultEndISO);
-  const [rentQty, setRentQty] = useState(1);
-  const [availLoading, setAvailLoading] = useState(false);
-  const [availQty, setAvailQty] = useState<number | null>(null);
-  const [availError, setAvailError] = useState<string | null>(null);
-
   // Lower details tab
-  const [infoTab, setInfoTab] = useState<"specs" | "description" | "warranty" | "reviews">(
-    product.specifications.length > 0 ? "specs" : "description"
-  );
+  const [infoTab, setInfoTab] = useState<
+    "specs" | "description" | "warranty" | "reviews"
+  >(product.specifications.length > 0 ? "specs" : "description");
 
   // Reviews state
   const [reviews, setReviews] = useState<ProductReview[]>(product.reviews ?? []);
@@ -121,100 +86,10 @@ export function ProductDetailClient({
   const baseSale = getBaseSalePrice(product, selectedVariant);
   const effectiveSale = getEffectiveSalePrice(product, selectedVariant);
   const discountPct = parseFloat(product.discount ?? "0") || 0;
-  const dailyRental = getEffectiveRentalPrice(product, selectedVariant);
-  const rentalDays = countRentalDays(startDate, endDate);
-  const rentalBreakdown = calculateRentalBreakdown(
-    dailyRental,
-    rentalDays,
-    rentQty,
-    DEPOSIT_MULTIPLIER
-  );
 
-  const ratingStats = useMemo(
-    () => getProductRatingStats({ reviews }),
-    [reviews]
-  );
+  const ratingStats = useMemo(() => getProductRatingStats({ reviews }), [reviews]);
 
-  // Clamp quantity cleanly without triggering synchronous setState in useEffect
   const safeBuyQty = Math.max(1, Math.min(buyQty, Math.max(1, stockCount)));
-
-  const canCheckAvailability =
-    actionTab === "rent" &&
-    product.is_for_rent &&
-    Boolean(startDate && endDate && endDate >= startDate) &&
-    isAuthenticated;
-
-  // Real-time fleet availability check when user is authenticated & on rent tab
-  useEffect(() => {
-    if (!canCheckAvailability) return;
-
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) {
-        setAvailLoading(true);
-        setAvailError(null);
-      }
-    });
-
-    api
-      .checkRentalAvailability({
-        product_id: product.id,
-        variant_id: selectedVariant?.id ?? null,
-        start_date: startDate,
-        end_date: endDate,
-      })
-      .then((res) => {
-        if (!cancelled) setAvailQty(res.available_quantity);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setAvailQty(null);
-          setAvailError(
-            err instanceof ApiError ? err.message : "Could not check availability."
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setAvailLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canCheckAvailability, product.id, selectedVariant, startDate, endDate]);
-
-  const effectiveAvailQty = canCheckAvailability ? availQty : null;
-
-  const handleReserveRental = () => {
-    if (!startDate || !endDate || endDate < startDate) {
-      showToast("End date cannot precede start date.", "error");
-      return;
-    }
-    if (!isAuthenticated) {
-      setRentalDraft({
-        productId: product.id,
-        variantId: selectedVariant?.id ?? null,
-        quantity: rentQty,
-        startDate,
-        endDate,
-      });
-      showToast("Please sign in or register to book construction equipment rentals.", "warning");
-      router.push(`/login?redirect=${encodeURIComponent("/rental-checkout")}`);
-      return;
-    }
-    if (effectiveAvailQty !== null && effectiveAvailQty < rentQty) {
-      showToast("Equipment is fully booked for these dates.", "error");
-      return;
-    }
-    setRentalDraft({
-      productId: product.id,
-      variantId: selectedVariant?.id ?? null,
-      quantity: rentQty,
-      startDate,
-      endDate,
-    });
-    router.push("/rental-checkout");
-  };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,9 +132,16 @@ export function ProductDetailClient({
     <div className="bg-[#F8FAFC] py-6 sm:py-8">
       <div className="mx-auto max-w-[1400px] px-4 space-y-8">
         {/* Breadcrumbs */}
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"
+        >
           <Link href="/" className="hover:text-slate-900">
             Home
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <Link href="/catalog" className="hover:text-slate-900">
+            Shop Catalog
           </Link>
           <ChevronRight className="h-3.5 w-3.5" />
           {product.category_name && (
@@ -351,7 +233,7 @@ export function ProductDetailClient({
             </div>
           </div>
 
-          {/* Right Column: Purchase & Rental Control Center */}
+          {/* Right Column: Purchase Control Center */}
           <div className="lg:col-span-6 space-y-5">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
               {/* Brand, Title, SKU, Ratings */}
@@ -398,7 +280,9 @@ export function ProductDetailClient({
                     type="button"
                     onClick={() => {
                       setInfoTab("reviews");
-                      document.getElementById("product-details-tabs")?.scrollIntoView({ behavior: "smooth" });
+                      document
+                        .getElementById("product-details-tabs")
+                        ?.scrollIntoView({ behavior: "smooth" });
                     }}
                     className="flex items-center gap-1.5 hover:underline"
                   >
@@ -418,7 +302,8 @@ export function ProductDetailClient({
                       {ratingStats.count > 0 ? ratingStats.average.toFixed(1) : "5.0"}
                     </span>
                     <span className="text-slate-500">
-                      ({ratingStats.count} {ratingStats.count === 1 ? "review" : "reviews"})
+                      ({ratingStats.count}{" "}
+                      {ratingStats.count === 1 ? "review" : "reviews"})
                     </span>
                   </button>
                   {product.warranty_information && (
@@ -462,7 +347,7 @@ export function ProductDetailClient({
                               ? `+${formatLKR(addPrice, false)}`
                               : formatLKR(addPrice, false)}
                             {" • "}
-                            {variant.stock} left
+                            {variant.available_stock ?? variant.stock} left
                           </div>
                         </button>
                       );
@@ -471,275 +356,85 @@ export function ProductDetailClient({
                 </div>
               )}
 
-              {/* Dual Option Tabs: Buy vs Rent */}
-              <div className="border-t border-slate-100 pt-4">
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1.5 mb-5">
+              {/* Sale Pricing & Cart Actions */}
+              <div className="border-t border-slate-100 pt-4 space-y-4">
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <span className="text-3xl font-extrabold text-slate-950">
+                    {formatLKR(effectiveSale)}
+                  </span>
+                  {discountPct > 0 && (
+                    <>
+                      <span className="text-base text-slate-400 line-through">
+                        {formatLKR(baseSale)}
+                      </span>
+                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                        Save {Math.round(discountPct)}%
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex items-center rounded-xl border border-slate-300 bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() => setBuyQty(Math.max(1, safeBuyQty - 1))}
+                      aria-label="Decrease quantity"
+                      className="p-3 text-slate-700 hover:text-slate-950"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="min-w-[40px] text-center text-sm font-bold">
+                      {safeBuyQty}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBuyQty(Math.min(Math.max(1, stockCount), safeBuyQty + 1))
+                      }
+                      disabled={safeBuyQty >= stockCount}
+                      aria-label="Increase quantity"
+                      className="p-3 text-slate-700 hover:text-slate-950 disabled:opacity-40"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    disabled={!product.is_for_sale}
-                    onClick={() => setActionTab("buy")}
-                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
-                      actionTab === "buy"
-                        ? "bg-[#F5A623] text-zinc-950 shadow-xs"
-                        : "text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
-                    }`}
+                    disabled={!isInStock || (activeVariants.length > 0 && !selectedVariant)}
+                    onClick={() =>
+                      void addToCart(product, safeBuyQty, selectedVariant, true)
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#F5A623] px-6 py-3.5 text-sm font-extrabold text-zinc-950 shadow-sm hover:bg-[#e09212] transition-all disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
                   >
                     <ShoppingCart className="h-4 w-4" />
-                    Buy New
+                    {!isInStock ? "Out of Stock" : "Add to Shopping Cart"}
                   </button>
+
                   <button
                     type="button"
-                    disabled={!product.is_for_rent}
-                    onClick={() => setActionTab("rent")}
-                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
-                      actionTab === "rent"
-                        ? "bg-[#EA580C] text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={() => void toggleWishlist(product)}
+                    aria-label="Save to wishlist"
+                    className={`rounded-xl border p-3.5 transition-colors ${
+                      wishlisted
+                        ? "border-red-300 bg-red-50 text-red-600"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <CalendarClock className="h-4 w-4" />
-                    Rent Tool
+                    <Heart className={`h-5 w-5 ${wishlisted ? "fill-current" : ""}`} />
                   </button>
                 </div>
 
-                {actionTab === "buy" && product.is_for_sale ? (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-baseline gap-3">
-                      <span className="text-3xl font-extrabold text-slate-950">
-                        {formatLKR(effectiveSale)}
-                      </span>
-                      {discountPct > 0 && (
-                        <>
-                          <span className="text-base text-slate-400 line-through">
-                            {formatLKR(baseSale)}
-                          </span>
-                          <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                            Save {Math.round(discountPct)}%
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="inline-flex items-center rounded-xl border border-slate-300 bg-slate-50">
-                        <button
-                          type="button"
-                          onClick={() => setBuyQty(Math.max(1, safeBuyQty - 1))}
-                          aria-label="Decrease quantity"
-                          className="p-3 text-slate-700 hover:text-slate-950"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="min-w-[40px] text-center text-sm font-bold">
-                          {safeBuyQty}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBuyQty(Math.min(Math.max(1, stockCount), safeBuyQty + 1))
-                          }
-                          disabled={safeBuyQty >= stockCount}
-                          aria-label="Increase quantity"
-                          className="p-3 text-slate-700 hover:text-slate-950 disabled:opacity-40"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={!isInStock || (activeVariants.length > 0 && !selectedVariant)}
-                        onClick={() => void addToCart(product, safeBuyQty, selectedVariant, true)}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#F5A623] px-6 py-3.5 text-sm font-extrabold text-zinc-950 shadow-sm hover:bg-[#e09212] transition-all disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        {!isInStock ? "Out of Stock" : "Add to Shopping Cart"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void toggleWishlist(product)}
-                        aria-label="Save to wishlist"
-                        className={`rounded-xl border p-3.5 transition-colors ${
-                          wishlisted
-                            ? "border-red-300 bg-red-50 text-red-600"
-                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Heart className={`h-5 w-5 ${wishlisted ? "fill-current" : ""}`} />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-baseline justify-between">
-                      <div>
-                        <span className="text-3xl font-extrabold text-[#EA580C]">
-                          {formatLKR(dailyRental)}
-                        </span>
-                        <span className="ml-1.5 text-sm font-semibold text-slate-500">
-                          / day
-                        </span>
-                      </div>
-                      <span className="rounded-md bg-orange-50 border border-orange-200 px-2.5 py-1 text-xs font-bold text-[#EA580C]">
-                        Min 1 Day &bull; 10x Deposit
-                      </span>
-                    </div>
-
-                    {/* Date Range Picker */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Start Date
-                        </label>
-                        <input
-                          type="date"
-                          min={todayISO}
-                          value={startDate}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setStartDate(val);
-                            if (endDate < val) setEndDate(val);
-                          }}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-[#EA580C] focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          End Date
-                        </label>
-                        <input
-                          type="date"
-                          min={startDate || todayISO}
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:border-[#EA580C] focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          Units Needed
-                        </label>
-                        <div className="flex items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setRentQty((q) => Math.max(1, q - 1))}
-                            className="p-1 text-slate-700"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="text-xs font-bold">{rentQty}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setRentQty((q) =>
-                                Math.min(effectiveAvailQty ?? Math.max(1, stockCount), q + 1)
-                              )
-                            }
-                            className="p-1 text-slate-700"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Real-Time Availability Banner */}
-                    {endDate < startDate ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        End date cannot precede start date.
-                      </div>
-                    ) : !isAuthenticated ? (
-                      <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-950">
-                        <span className="font-medium">
-                          Sign in to verify live fleet calendar availability &amp; lock booking ({stockCount} total units in depot).
-                        </span>
-                        <Link
-                          href={`/login?redirect=${encodeURIComponent(`/product/${product.id}?tab=rent`)}`}
-                          className="shrink-0 font-bold text-[#D97706] underline"
-                        >
-                          Sign In
-                        </Link>
-                      </div>
-                    ) : availLoading ? (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-medium text-slate-600">
-                        Checking live fleet calendar availability...
-                      </div>
-                    ) : availError ? (
-                      <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
-                        {availError}
-                      </div>
-                    ) : effectiveAvailQty !== null && effectiveAvailQty >= rentQty ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800">
-                        <CheckCircle2 className="h-4 w-4 shrink-0" />
-                        Available for Selected Dates ({effectiveAvailQty} units in fleet)
-                      </div>
-                    ) : effectiveAvailQty !== null ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-bold text-red-800">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        Unavailable for these dates. Please adjust your rental period.
-                      </div>
-                    ) : null}
-
-                    {/* Transparent 10x Deposit Breakdown (§6.3) */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
-                      <div className="flex justify-between text-slate-600">
-                        <span>Daily Rate</span>
-                        <span className="font-semibold text-slate-900">
-                          {formatLKR(dailyRental)} / day
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-600">
-                        <span>Duration</span>
-                        <span className="font-semibold text-slate-900">
-                          {rentalDays} {rentalDays === 1 ? "Day" : "Days"} (
-                          {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)})
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-600">
-                        <span>Rental Fee ({rentQty} unit{rentQty > 1 ? "s" : ""})</span>
-                        <span className="font-semibold text-slate-900">
-                          {formatLKR(rentalBreakdown.rentalSubtotal)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-slate-700">
-                        <span>
-                          Refundable Deposit ({DEPOSIT_MULTIPLIER}x Daily Rate &ndash; 100% Refundable)
-                        </span>
-                        <span className="font-bold text-slate-950">
-                          {formatLKR(rentalBreakdown.securityDeposit)}
-                        </span>
-                      </div>
-                      <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-950">
-                        <span>Total Due Now</span>
-                        <span>{formatLKR(rentalBreakdown.totalPayable)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
-                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
-                      <span>
-                        The security deposit of{" "}
-                        <strong>{formatLKR(rentalBreakdown.securityDeposit)}</strong> is fully
-                        refunded immediately upon safe return and inspection of the equipment.
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleReserveRental}
-                      disabled={
-                        endDate < startDate ||
-                        (isAuthenticated && effectiveAvailQty !== null && effectiveAvailQty < rentQty)
-                      }
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#EA580C] py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-orange-700 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      <CalendarClock className="h-4 w-4" />
-                      Reserve for Rental
-                    </button>
-                  </div>
-                )}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-600 flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-[#F5A623] shrink-0" />
+                    Fast islandwide delivery &bull; Verified Direct Bank Transfer checkout
+                  </span>
+                  <Link href="/rentals" className="font-bold text-[#EA580C] hover:underline shrink-0">
+                    Rent Fleet &rarr;
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -757,14 +452,16 @@ export function ProductDetailClient({
                 label: `Technical Specifications (${product.specifications.length})`,
               },
               { id: "description", label: "Description & Applications" },
-              { id: "warranty", label: "Warranty & Rental Terms" },
+              { id: "warranty", label: "Warranty & Bank Transfer Info" },
               { id: "reviews", label: `Customer Reviews (${ratingStats.count})` },
             ].map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() =>
-                  setInfoTab(tab.id as "specs" | "description" | "warranty" | "reviews")
+                  setInfoTab(
+                    tab.id as "specs" | "description" | "warranty" | "reviews"
+                  )
                 }
                 className={`rounded-t-lg px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
                   infoTab === tab.id
@@ -822,19 +519,18 @@ export function ProductDetailClient({
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <p className="font-bold text-emerald-900">Manufacturer / Depot Warranty</p>
                   <p className="mt-1 text-emerald-800">
-                    {product.warranty_information || "Standard Universal Tool Depot Quality Guarantee"}
+                    {product.warranty_information ||
+                      "Standard Universal Tool Depot Quality Guarantee"}
                   </p>
                 </div>
-                {product.is_for_rent && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1.5">
-                    <p className="font-bold text-amber-950">
-                      Equipment Rental Inspection &amp; Deposit Policy
-                    </p>
-                    <p className="text-amber-900">
-                      Rentals include a 100% refundable 10x security deposit ({formatLKR(dailyRental * 10)}) held while the tool is on site. Return equipment clean and undamaged to receive immediate deposit release.
-                    </p>
-                  </div>
-                )}
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1.5">
+                  <p className="font-bold text-amber-950">
+                    Payment &amp; Dispatch Verification
+                  </p>
+                  <p className="text-amber-900">
+                    Purchases are settled via Direct Bank Transfer to Commercial Bank of Ceylon (A/C 1000 8923 4510, Colombo 03). Orders are confirmed promptly upon receipt verification.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -990,11 +686,11 @@ export function ProductDetailClient({
           </div>
         </section>
 
-        {/* Related Equipment */}
+        {/* Related Sale Equipment */}
         {relatedProducts.length > 0 && (
           <section className="space-y-4">
             <h2 className="font-display text-2xl font-extrabold text-slate-900">
-              Related Tools &amp; Machinery
+              Related Tools for Sale
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {relatedProducts.map((rel) => (
@@ -1020,9 +716,7 @@ export function ProductDetailClient({
                       {rel.name}
                     </p>
                     <p className="text-sm font-extrabold text-slate-950">
-                      {rel.is_for_sale
-                        ? formatLKR(getEffectiveSalePrice(rel), false)
-                        : `${formatLKR(getEffectiveRentalPrice(rel), false)} / day`}
+                      {formatLKR(getEffectiveSalePrice(rel), false)}
                     </p>
                   </Link>
                 </div>
